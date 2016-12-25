@@ -490,20 +490,13 @@ extern void wait_on_page_bit(struct page *page, int bit_nr);
 extern void wait_on_page_bit_timeout(struct page *page, int bit_nr);
 
 extern int wait_on_page_bit_killable(struct page *page, int bit_nr);
-extern int wait_on_page_bit_killable_timeout(struct page *page,
-					     int bit_nr, unsigned long timeout);
+extern void wake_up_page_bit(struct page *page, int bit_nr);
 
-static inline int wait_on_page_locked_killable(struct page *page)
-{
-	if (!PageLocked(page))
-		return 0;
-	return wait_on_page_bit_killable(compound_head(page), PG_locked);
-}
-
-extern wait_queue_head_t *page_waitqueue(struct page *page);
 static inline void wake_up_page(struct page *page, int bit)
 {
-	__wake_up_bit(page_waitqueue(page), &page->flags, bit);
+	if (!PageWaiters(page))
+		return;
+	wake_up_page_bit(page, bit);
 }
 
 /* 
@@ -519,11 +512,19 @@ static inline void wait_on_page_locked(struct page *page)
 		wait_on_page_bit(compound_head(page), PG_locked);
 }
 
+static inline int wait_on_page_locked_killable(struct page *page)
+{
+	if (!PageLocked(page))
+		return 0;
+	return wait_on_page_bit_killable(compound_head(page), PG_locked);
+}
+
 static inline void wait_on_page_locked_timeout(struct page *page)
 {
 	if (PageLocked(page))
 		wait_on_page_bit_timeout(page, PG_locked);
 }
+
 
 /* 
  * Wait for a page to complete writeback
