@@ -40,6 +40,7 @@ struct binder_transaction;
  * @offsets_size:       describe the second member of struct blah,
  * @extra_buffers_size: describe the second member of struct blah,
  * @data:i              describe the second member of struct blah,
+ * @pid:                pid to attribute the buffer to (caller)
  *
  * Bookkeeping structure for binder transaction buffers
  */
@@ -59,6 +60,7 @@ struct binder_buffer {
 	size_t offsets_size;
 	size_t extra_buffers_size;
 	void *data;
+	int    pid;
 };
 
 /**
@@ -127,7 +129,8 @@ extern struct binder_buffer *binder_alloc_new_buf(struct binder_alloc *alloc,
 						  size_t data_size,
 						  size_t offsets_size,
 						  size_t extra_buffers_size,
-						  int is_async);
+						  int is_async,
+						  int pid);
 extern void binder_alloc_init(struct binder_alloc *alloc);
 extern int binder_alloc_shrinker_init(void);
 extern void binder_alloc_vma_close(struct binder_alloc *alloc);
