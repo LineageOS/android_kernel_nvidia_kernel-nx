@@ -1905,7 +1905,7 @@ static struct tegra_clk_pll_params pll_m_params = {
 	.cf_min = 9600000,
 	.cf_max = 19200000,
 	.vco_min = 800000000,
-	.vco_max = 1866000000,
+	.vco_max = 2133000000,
 	.base_reg = PLLM_BASE,
 	.misc_reg = PLLM_MISC2,
 	.lock_mask = PLL_BASE_LOCK,
@@ -1932,7 +1932,7 @@ static struct tegra_clk_pll_params pll_mb_params = {
 	.cf_min = 9600000,
 	.cf_max = 19200000,
 	.vco_min = 800000000,
-	.vco_max = 1866000000,
+	.vco_max = 2133000000,
 	.base_reg = PLLMB_BASE,
 	.misc_reg = PLLMB_MISC1,
 	.lock_mask = PLL_BASE_LOCK,
@@ -3531,7 +3531,7 @@ static __init void tegra210_shared_clk_init(char *sclk_high_clk)
 
 	clk = tegra_clk_register_shared_master("emc_master", "emc",
 		emc_is_native ? TEGRA_SHARED_BUS_EMC_NATIVE : 0,
-		12750000, t210b01 ? 3200000000 : 2133000000);
+		12750000, t210b01 ? 2133000000 : 1866000000);
 	if (clk) {
 		to_clk_cbus_shared(__clk_get_hw(clk))->users_default_rate =
 			204000000;
