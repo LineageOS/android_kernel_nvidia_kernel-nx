@@ -145,6 +145,9 @@ do {									\
 	asm volatile(   "dsb sy\n"					\
 			"isb\n" : : : "memory")
 
+#define spec_bar()							\
+	speculation_barrier()
+
 #include <asm-generic/barrier.h>
 
 #endif	/* __ASSEMBLY__ */
