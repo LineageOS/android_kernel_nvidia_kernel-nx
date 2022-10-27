@@ -1288,7 +1288,7 @@ static void sio_parse_imu_report(struct joycon_ctlr *ctlr,
 				    struct sio_input_report *rep)
 {
 	struct device *dev = &ctlr->sdev->dev;
-	struct joycon_imu_data imu_data[15] = {0}; /* 15 reports per packet */
+	struct joycon_imu_data imu_data[15] = {{0}}; /* 15 reports per packet */
 	struct input_dev *idev = ctlr->imu_input;
 	unsigned int msecs = jiffies_to_msecs(jiffies);
 	unsigned int last_msecs = ctlr->imu_last_pkt_ms;
