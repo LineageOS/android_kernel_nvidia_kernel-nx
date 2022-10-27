@@ -2072,6 +2072,15 @@ static int sdhci_tegra_parse_dt(struct platform_device *pdev)
 	if (!np)
 		return -EINVAL;
 
+	/* if bus-width is set and forced to 1 bit adhere to that */
+	if (!of_property_read_u32(np, "bus-width", &val)) {
+		if (val == 1) {
+			host->quirks |= SDHCI_QUIRK_FORCE_1_BIT_DATA;
+			host->caps &= ~(MMC_CAP_8_BIT_DATA | MMC_CAP_4_BIT_DATA);
+			dev_warn(&pdev->dev, "bus width forced to 1 bit\n");
+		}
+	}
+
 	of_property_read_u32(np, "max-clk-limit", (u32 *)&tegra_host->max_clk_limit);
 	of_property_read_u32(np, "ddr-clk-limit",
 		(u32 *)&tegra_host->max_ddr_clk_limit);
