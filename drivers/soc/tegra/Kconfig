@@ -89,3 +89,27 @@ config TEGRA_USE_NA_GPCPLL
 	  Enable noise aware (NA) mode of GM20b GPCPLL. In this mode PLL output
 	  frequency is automatically adjusted when GM20b voltage is fluctuating
 	  because of transient PMIC or power distribution tree noise.
+
+
+config TEGRA_124_R2P
+	bool "Tegra124 Reboot 2 Payload support"
+	depends on ARCH_TEGRA_124_SOC
+	select TEGRA_R2P
+	default n
+	help
+	  This enables a special reboot path which allows the board to reboot
+	  to a specified bootloader other than the one in boot storage.
+
+	  If in doubt, say N.
+
+config TEGRA_210_R2P
+	bool "Tegra210 Reboot 2 Payload support"
+	depends on ARCH_TEGRA_210_SOC
+	select TEGRA_R2P
+	default n
+	help
+	  This enables a special reboot path which allows the board to reboot
+	  to a specified bootloader other than the one in boot storage.
+
+	  If in doubt, say N.
+      
