@@ -2,7 +2,8 @@
  *  linux/drivers/mmc/host/sdhci.c - Secure Digital Host Controller Interface driver
  *
  *  Copyright (C) 2005-2008 Pierre Ossman, All Rights Reserved.
- *  Copyright (c) 2012-2017, NVIDIA CORPORATION.  All rights reserved.
+ *  Copyright (c) 2012-2019, NVIDIA CORPORATION.  All rights reserved.
+ *  Copyright (c) 2023, CTCaer.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1509,6 +1510,20 @@ void sdhci_set_card_clock(struct sdhci_host *host, bool enable)
 }
 EXPORT_SYMBOL_GPL(sdhci_set_card_clock);
 
+static int sdhci_set_io_power_reg(struct mmc_host *mmc, bool enable)
+{
+	int ret = 0;
+
+	if (!IS_ERR_OR_NULL(mmc->supply.vqmmc)) {
+		if (enable && !regulator_is_enabled(mmc->supply.vqmmc))
+			ret = regulator_enable(mmc->supply.vqmmc);
+		else if (!enable && regulator_is_enabled(mmc->supply.vqmmc))
+			ret = regulator_disable(mmc->supply.vqmmc);
+	}
+
+	return ret;
+}
+
 static void sdhci_set_power_reg(struct sdhci_host *host, unsigned char mode,
 				unsigned short vdd)
 {
@@ -1516,6 +1531,7 @@ static void sdhci_set_power_reg(struct sdhci_host *host, unsigned char mode,
 
 	spin_unlock_irq(&host->lock);
 	mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
+	sdhci_set_io_power_reg(mmc, vdd != 0);
 	spin_lock_irq(&host->lock);
 
 	if (mode != MMC_POWER_OFF)
@@ -1797,9 +1813,11 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 	if (host->flags & SDHCI_DEVICE_DEAD) {
 		spin_unlock_irqrestore(&host->lock, flags);
-		if (!IS_ERR_OR_NULL(mmc->supply.vmmc) &&
-		    ios->power_mode == MMC_POWER_OFF)
-			mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+		if (ios->power_mode == MMC_POWER_OFF) {
+			if (!IS_ERR_OR_NULL(mmc->supply.vmmc))
+				mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+			sdhci_set_io_power_reg(mmc, false);
+		}
 		return;
 	}
 
@@ -4048,8 +4066,7 @@ int sdhci_setup_host(struct sdhci_host *host)
 	return 0;
 
 unreg:
-	if (!IS_ERR_OR_NULL(mmc->supply.vqmmc))
-		regulator_disable(mmc->supply.vqmmc);
+	sdhci_set_io_power_reg(mmc, false);
 undma:
 	if (host->align_buffer)
 		dma_free_coherent(mmc_dev(mmc), host->align_buffer_sz +
@@ -4206,8 +4223,7 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
 
 	tasklet_kill(&host->finish_tasklet);
 
-	if (!IS_ERR_OR_NULL(mmc->supply.vqmmc))
-		regulator_disable(mmc->supply.vqmmc);
+	sdhci_set_io_power_reg(mmc, false);
 
 	if (host->align_buffer)
 		dma_free_coherent(mmc_dev(mmc), host->align_buffer_sz +
