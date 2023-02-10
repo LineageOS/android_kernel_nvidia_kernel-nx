@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2014-2021, NVIDIA CORPORATION.  All rights reserved.
  * Copyright (C) 2015 Google, Inc.
- * Copyright (C) 2022 CTCaer
+ * Copyright (C) 2022-2023 CTCaer
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -736,6 +736,67 @@ static int tegra210_pex_uphy_enable(struct tegra_xusb_padctl *padctl)
 	tegra210_xusb_pll_hw_sequence_start();
 
 	return 0;
+}
+
+static void tegra210_pex_uphy_pll_enable(struct tegra_xusb_padctl *padctl)
+{
+	unsigned long timeout;
+	u32 value;
+
+	value = padctl_readl(padctl, XUSB_PADCTL_UPHY_PLL_P0_CTL1);
+	value &= ~XUSB_PADCTL_UPHY_PLL_CTL1_IDDQ;
+	padctl_writel(padctl, value, XUSB_PADCTL_UPHY_PLL_P0_CTL1);
+
+	value = padctl_readl(padctl, XUSB_PADCTL_UPHY_PLL_P0_CTL1);
+	value &= ~(XUSB_PADCTL_UPHY_PLL_CTL1_SLEEP_MASK <<
+		   XUSB_PADCTL_UPHY_PLL_CTL1_SLEEP_SHIFT);
+	padctl_writel(padctl, value, XUSB_PADCTL_UPHY_PLL_P0_CTL1);
+
+	usleep_range(10, 20);
+
+	/* enable PEX PLL */
+	value = padctl_readl(padctl, XUSB_PADCTL_UPHY_PLL_P0_CTL1);
+	value |= XUSB_PADCTL_UPHY_PLL_CTL1_ENABLE;
+	padctl_writel(padctl, value, XUSB_PADCTL_UPHY_PLL_P0_CTL1);
+
+	timeout = jiffies + msecs_to_jiffies(100);
+	while (time_before(jiffies, timeout)) {
+		value = padctl_readl(padctl, XUSB_PADCTL_UPHY_PLL_P0_CTL1);
+		if (value & XUSB_PADCTL_UPHY_PLL_CTL1_LOCKDET_STATUS)
+			break;
+
+		usleep_range(10, 20);
+	}
+	value = padctl_readl(padctl, XUSB_PADCTL_UPHY_PLL_P0_CTL1);
+	if (!(value & XUSB_PADCTL_UPHY_PLL_CTL1_LOCKDET_STATUS))
+		dev_err(padctl->dev, "UPHY PEX PLL lock timeout\n");
+}
+
+static void tegra210_pex_uphy_pll_disable(struct tegra_xusb_padctl *padctl)
+{
+	u32 value;
+
+	value = padctl_readl(padctl, XUSB_PADCTL_UPHY_PLL_P0_CTL1);
+	value |= XUSB_PADCTL_UPHY_PLL_CTL1_PWR_OVRD;
+	padctl_writel(padctl, value, XUSB_PADCTL_UPHY_PLL_P0_CTL1);
+
+	/* disable PEX PLL */
+	value = padctl_readl(padctl, XUSB_PADCTL_UPHY_PLL_P0_CTL1);
+	value &= ~XUSB_PADCTL_UPHY_PLL_CTL1_ENABLE;
+	padctl_writel(padctl, value, XUSB_PADCTL_UPHY_PLL_P0_CTL1);
+
+	usleep_range(10, 20);
+
+	value = padctl_readl(padctl, XUSB_PADCTL_UPHY_PLL_P0_CTL1);
+	value |= (XUSB_PADCTL_UPHY_PLL_CTL1_SLEEP_MASK <<
+		   XUSB_PADCTL_UPHY_PLL_CTL1_SLEEP_SHIFT);
+	padctl_writel(padctl, value, XUSB_PADCTL_UPHY_PLL_P0_CTL1);
+
+	value = padctl_readl(padctl, XUSB_PADCTL_UPHY_PLL_P0_CTL1);
+	value |= XUSB_PADCTL_UPHY_PLL_CTL1_IDDQ;
+	padctl_writel(padctl, value, XUSB_PADCTL_UPHY_PLL_P0_CTL1);
+
+	usleep_range(10, 20);
 }
 
 /* must be called under padctl->lock */
@@ -3589,6 +3650,10 @@ static int tegra210_xusb_padctl_suspend_noirq(struct tegra_xusb_padctl *padctl)
 
 	tegra210_xusb_padctl_save(padctl);
 
+	/* HW erratum: Disable UPHY PEX PLL on T210b01 for power saving */
+	if (t210b01_compatible(padctl) == 1)
+		tegra210_pex_uphy_pll_disable(padctl);
+
 	clk_disable_unprepare(priv->plle);
 
 	mutex_unlock(&padctl->lock);
@@ -3621,6 +3686,10 @@ static int tegra210_xusb_padctl_resume_noirq(struct tegra_xusb_padctl *padctl)
 		 */
 
 		dev_dbg(padctl->dev, "skip PLL init as PLLE in HW");
+
+		/* HW erratum: Restore previously disabled UPHY PEX PLL on T210b01 */
+		if (t210b01_compatible(padctl) == 1)
+			tegra210_pex_uphy_pll_enable(padctl);
 
 		err = clk_prepare_enable(priv->plle);
 		if (err) {
