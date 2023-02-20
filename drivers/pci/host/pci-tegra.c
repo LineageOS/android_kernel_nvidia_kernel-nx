@@ -9,6 +9,8 @@
  *
  * Bits taken from arch/arm/mach-dove/pcie.c
  *
+ * Copyright (c) 2023, CTCaer.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -516,6 +518,7 @@ struct tegra_pcie_port {
 	struct device_node *np;
 	int n_gpios;
 	int *gpios;
+	bool sw_link_disable;
 };
 
 struct tegra_pcie_bus {
@@ -2164,6 +2167,10 @@ static bool tegra_pcie_port_check_link(struct tegra_pcie_port *port)
 	unsigned int retries = 3;
 	unsigned long value;
 
+	/* if port is software disabled do not detect presence */
+	if (port->sw_link_disable)
+		return false;
+
 	/* override presence detection */
 	value = readl(port->base + NV_PCIE2_RP_PRIV_MISC);
 	value &= ~PCIE2_RP_PRIV_MISC_PRSNT_MAP_EP_ABSNT;
@@ -3257,8 +3264,6 @@ static void tegra_pcie_read_plat_data(struct tegra_pcie *pcie)
 		of_get_named_gpio(node, "nvidia,wake-gpio", 0);
 	pcie->plat_data->gpio_x1_slot =
 		of_get_named_gpio(node, "nvidia,x1-slot-gpio", 0);
-	pcie->plat_data->has_memtype_lpddr4 =
-		of_property_read_bool(node, "nvidia,has_memtype_lpddr4");
 }
 
 static char *t124_rail_names[] = {"hvdd-pex", "hvdd-pex-pll-e", "dvddio-pex",
@@ -3565,6 +3570,9 @@ static int tegra_pcie_parse_dt(struct tegra_pcie *pcie)
 				rp->gpios[count] = gpio;
 			}
 		}
+
+		rp->sw_link_disable = of_property_read_bool(port,
+			"nvidia,sw-link-disable");
 
 		list_add_tail(&rp->list, &pcie->ports);
 	}
