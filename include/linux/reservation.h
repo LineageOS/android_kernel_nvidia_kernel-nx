@@ -105,7 +105,7 @@ reservation_object_init(struct reservation_object *obj)
 static inline void
 reservation_object_fini(struct reservation_object *obj)
 {
-	int i;
+	u32 i;
 	struct reservation_object_list *fobj;
 	struct fence *excl;
 
