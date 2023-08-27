@@ -58,6 +58,7 @@
 #include <linux/compat.h>
 #include <linux/vmalloc.h>
 #include <linux/tegra_profiler.h>
+#include <linux/ksm.h>
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
