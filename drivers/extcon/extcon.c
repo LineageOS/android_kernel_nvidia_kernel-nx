@@ -299,6 +299,12 @@ struct __extcon_info {
 		.name = "USB-PD",
 	},
 
+	[EXTCON_AC_ADAPTOR] = {
+		.type = EXTCON_TYPE_MISC,
+		.id = EXTCON_AC_ADAPTOR,
+		.name = "AC-ADAPTOR",
+	},
+
 	{ /* sentinel */ }
 };
 
