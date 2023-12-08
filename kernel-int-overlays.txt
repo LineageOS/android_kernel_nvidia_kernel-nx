@@ -1,4 +1,4 @@
-nvidia
+nvidia-nx
 nvlink
 nvgpu
 nvgpu-next

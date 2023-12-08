@@ -20,7 +20,7 @@ override KERNEL_OVERLAYS := $(abspath $(KERNEL_OVERLAYS))
 export KERNEL_OVERLAYS
 
 define set_srctree_overlay
-  overlay_name := $(lastword $(subst /, ,$(overlay)))
+  overlay_name := $(patsubst %nvidia-nx,%nvidia,$(lastword $(subst /, ,$(overlay))))
   srctree.$(overlay_name) := $(overlay)
   export srctree.$(overlay_name)
 endef
