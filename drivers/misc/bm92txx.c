@@ -359,6 +359,24 @@
 #define PD_INPUT_CURRENT_LIMIT_MAX_MA   3000u
 #define PD_INPUT_VOLTAGE_LIMIT_MAX_MV   17000u
 
+enum {
+	LED_OFF,
+	LED_STATIC,
+	LED_BREATHING
+};
+
+static int dp_resume_toggle = 1;
+static int dock_led_suspend = LED_BREATHING;
+static int dock_pwr_nin_limit = 1;
+
+module_param(dp_resume_toggle, int, 0664);
+module_param(dock_led_suspend, int, 0664);
+module_param(dock_pwr_nin_limit, int, 0664);
+
+MODULE_PARM_DESC(dp_resume_toggle, "Do a DP toggle after resume");
+MODULE_PARM_DESC(dock_led_suspend, "Dock led mode on suspend");
+MODULE_PARM_DESC(dock_pwr_nin_limit, "Do max power check for Nintendo dock");
+
 /* All states with ND are for Nintendo Dock */
 enum bm92t_state_type {
 	INIT_STATE = 0,
@@ -435,11 +453,7 @@ struct bm92t_platform_data {
 
 	bool dp_disable;
 	bool dp_alerts_enable;
-	bool dp_signal_toggle_on_resume;
 	unsigned int dp_lanes;
-
-	bool led_static_on_suspend;
-	bool dock_power_limit_disable;
 
 	unsigned int pd_5v_current_limit;
 	unsigned int pd_9v_current_limit;
@@ -1083,7 +1097,7 @@ static bool bm92t_check_pdo(struct bm92t_info *info)
 		info->cable.drd_support = true;
 
 	/* Check for dock mode */
-	if (!info->pdata->dock_power_limit_disable &&
+	if (dock_pwr_nin_limit &&
 	    pdos_no == 2 &&
 	    (pdo[0].volt * 50) == DOCK_ID_VOLTAGE_MV  &&
 	    (pdo[0].amp * 10)  == DOCK_ID_CURRENT_MA)
@@ -2266,22 +2280,15 @@ static struct bm92t_platform_data *bm92t_parse_dt(struct device *dev)
 	pdata->dp_disable = of_property_read_bool(np, "rohm,dp-disable");
 	pdata->dp_alerts_enable = of_property_read_bool(np,
 					"rohm,dp-alerts-enable");
-	pdata->dp_signal_toggle_on_resume = of_property_read_bool(np,
-					"rohm,dp-signal-toggle-on-resume");
 	ret = of_property_read_u32(np, "rohm,dp-lanes", &pdata->dp_lanes);
 	if (ret)
 		pdata->dp_lanes = 2;
 
 	if (pdata->dp_disable) {
 		pdata->dp_alerts_enable = false;
-		pdata->dp_signal_toggle_on_resume = false;
+		dp_resume_toggle = 0;
 		dev_info(dev, "DP handling disabled\n");
 	}
-
-	pdata->led_static_on_suspend = of_property_read_bool(np,
-					"rohm,led-static-on-suspend");
-	pdata->dock_power_limit_disable = of_property_read_bool(np,
-					"rohm,dock-power-limit-disable");
 
 	ret = of_property_read_u32(np, "rohm,pd-5v-current-limit-ma",
 			&pdata->pd_5v_current_limit);
@@ -2497,11 +2504,20 @@ static int bm92t_pm_suspend(struct device *dev)
 		info->vbus_suspended = true;
 	}
 
-	/* Dim or breathing Dock LED */
-	if (info->pdata->led_static_on_suspend)
+	/* Dim or breathing or turned off Dock LED */
+	switch (dock_led_suspend)
+	{
+	case LED_STATIC:
 		bm92t_usbhub_led_cfg_wait(info, 16, 0, 0, 128);
-	else
+		break;
+	case LED_OFF:
+		bm92t_usbhub_led_cfg_wait(info, 0, 0, 0, 128);
+		break;
+	case LED_BREATHING:
+	default:
 		bm92t_usbhub_led_cfg_wait(info, 32, 1, 255, 255);
+		break;
+	}
 
 	if (client->irq > 0) {
 		disable_irq(client->irq);
@@ -2539,7 +2555,7 @@ static int bm92t_pm_resume(struct device *dev)
 	 * and enable in resume, because this also disables the
 	 * led effects.
 	 */
-	if (info->pdata->dp_signal_toggle_on_resume) {
+	if (!info->pdata->dp_disable && dp_resume_toggle) {
 		bm92t_usbhub_dp_sleep(info, true);
 		bm92t_usbhub_dp_sleep(info, false);
 	}
