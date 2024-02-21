@@ -1,7 +1,7 @@
 /*
  * bm92txx.c
  *
- * Copyright (c) 2020-2022 CTCaer <ctcaer@gmail.com>
+ * Copyright (c) 2020-2024 CTCaer <ctcaer@gmail.com>
  *
  * Authors:
  *     CTCaer <ctcaer@gmail.com>
@@ -386,7 +386,7 @@ enum bm92t_state_type {
 	VDM_CUSTOM_CMD_SENT,
 	VDM_ACCEPT_CUSTOM_CMD_REPLY,
 	NINTENDO_CONFIG_HANDLED,
-	NORMAL_CONFIG_HANDLED
+	DOCK_CONFIG_HANDLED
 };
 
 struct __attribute__((packed)) pd_object {
@@ -504,7 +504,7 @@ static const char * const states[] = {
 	"VDM_CUSTOM_CMD_SENT",
 	"VDM_ACCEPT_CUSTOM_CMD_REPLY",
 	"NINTENDO_CONFIG_HANDLED",
-	"NORMAL_CONFIG_HANDLED"
+	"DOCK_CONFIG_HANDLED"
 };
 
 static const unsigned int bm92t_extcon_cable[] = {
@@ -697,6 +697,12 @@ static inline bool bm92t_is_lastcmd_ok(struct bm92t_info *info,
 
 	return (lastcmd_status == LASTCMD_COMPLETE);
 }
+
+static inline unsigned int bm92t_lastcmd_status(const short status1_data)
+{
+	return ((status1_data & STATUS1_LASTCMD_MASK) >> STATUS1_LASTCMD_SHIFT);
+}
+
 
 static int bm92t_handle_dp_config_and_hpd(struct bm92t_info *info)
 {
@@ -1176,7 +1182,7 @@ static int bm92t_send_rdo(struct bm92t_info *info)
 		dev_err(&info->i2c_client->dev, "Send RDO failure!\n");
 		return -ENODEV;
 	}
-	
+
 	bm92t_send_cmd(info, &cmd);
 
 	return 0;
@@ -1230,7 +1236,7 @@ static void bm92t_usbhub_dp_sleep(struct bm92t_info *info, bool sleep)
 {
 	int retries = 100;
 	if (info->state == NINTENDO_CONFIG_HANDLED ||
-	    info->state == NORMAL_CONFIG_HANDLED) {
+	    info->state == DOCK_CONFIG_HANDLED) {
 
 		if (info->state == NINTENDO_CONFIG_HANDLED)
 			bm92t_state_machine(info, VDM_ND_CUSTOM_CMD_SENT);
@@ -1243,7 +1249,7 @@ static void bm92t_usbhub_dp_sleep(struct bm92t_info *info, bool sleep)
 			sizeof(vdm_usbhub_dp_sleep_msg));
 
 		while (info->state != NINTENDO_CONFIG_HANDLED ||
-		       info->state != NORMAL_CONFIG_HANDLED) {
+		       info->state != DOCK_CONFIG_HANDLED) {
 			retries--;
 			if (retries < 0)
 				break;
@@ -1416,7 +1422,7 @@ src_fault:
 			bm92t_extcon_cable_update(info, EXTCON_USB, false);
 			bm92t_extcon_cable_update(info, EXTCON_USB_HOST, true);
 			goto ret;
-		} else if (alert_data & ALERT_CONTRACT && !info->first_init) {
+		} else if (alert_data & ALERT_CONTRACT) {
 			/* When there's a plug-in wake-up, check if a new
 			 * contract was received. If yes continue with init.
 			 *
@@ -1425,7 +1431,7 @@ src_fault:
 			 * In case of non-PD charger, this doesn't affect the
 			 * result.
 			 */
-			if (!(alert_data & ALERT_PDO))
+			if (!info->first_init && !(alert_data & ALERT_PDO))
 				msleep(500);
 		} else /* Simple plug event */
 			goto ret;
@@ -1543,12 +1549,18 @@ init_contract_out:
 				cmd = DR_SWAP_CMD;
 				err = bm92t_send_cmd(info, &cmd);
 				bm92t_state_machine(info, DR_SWAP_SENT);
-			}
-			else if (bm92t_is_dfp(status1_data)) {
+			} else if (bm92t_is_dfp(status1_data)) {
 				dev_dbg(dev, "Already in DFP mode\n");
 				bm92t_send_vdm(info, vdm_discover_id_msg,
 					       sizeof(vdm_discover_id_msg));
 				bm92t_state_machine(info, VDM_DISC_ID_SENT);
+		} else if (bm92t_is_plugged(status1_data) &&
+			   bm92t_lastcmd_status(status1_data) ==
+							     LASTCMD_REJECTED) {
+			/* UFP rejected data role swap. */
+			bm92t_extcon_cable_update(info, EXTCON_USB_HOST, false);
+			bm92t_extcon_cable_update(info, EXTCON_USB, true);
+			bm92t_state_machine(info, INIT_STATE);
 			}
 		}
 		break;
@@ -1569,8 +1581,18 @@ init_contract_out:
 			cmd = ACCEPT_VDM_CMD;
 			err = bm92t_send_cmd(info, &cmd);
 			bm92t_state_machine(info, VDM_ACCEPT_DISC_ID_REPLY);
-		} else if (bm92t_is_success(alert_data))
+		} else if (bm92t_is_success(alert_data)) {
 			dev_dbg(dev, "cmd done in VDM_DISC_ID_SENT\n");
+		} else {
+			/* Some chargers do not reply even though they accept
+			 * the command. So also handle new power events here.
+			 */
+			if ((alert_data & ALERT_SRC_PLUGIN) ||
+			    (alert_data & ALERT_CONTRACT)) {
+				bm92t_state_machine(info, INIT_STATE);
+				goto handle_new_state;
+			}
+		}
 		break;
 
 	case VDM_ACCEPT_DISC_ID_REPLY:
@@ -1592,7 +1614,7 @@ init_contract_out:
 
 				if (info->pdata->dp_disable) {
 					bm92t_state_machine(info,
-							NORMAL_CONFIG_HANDLED);
+							DOCK_CONFIG_HANDLED);
 					break;
 				}
 
@@ -1741,7 +1763,7 @@ init_contract_out:
 						      VDM_ND_QUERY_DEVICE_SENT);
 				} else
 					bm92t_state_machine(info,
-						      NORMAL_CONFIG_HANDLED);
+						      DOCK_CONFIG_HANDLED);
 				bm92t_extcon_cable_update(info,
 							  EXTCON_DISP_DP, true);
 			}
@@ -1876,12 +1898,12 @@ init_contract_out:
 			/* Read incoming VDM */
 			err = bm92t_read_reg(info, INCOMING_VDM_REG, vdm,
 					     sizeof(vdm));
-			bm92t_state_machine(info, NORMAL_CONFIG_HANDLED);
+			bm92t_state_machine(info, DOCK_CONFIG_HANDLED);
 		}
 		break;
 
-	case NORMAL_CONFIG_HANDLED:
 	case NINTENDO_CONFIG_HANDLED:
+	case DOCK_CONFIG_HANDLED:
 		break;
 
 	default:
