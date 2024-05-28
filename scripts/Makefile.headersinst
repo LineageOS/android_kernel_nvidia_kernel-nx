@@ -15,7 +15,7 @@ include scripts/Kbuild.include
 
 srcdir        := $(srctree)/$(obj)
 define set_srcdir_overlay
-  oname := $(lastword $(subst /, ,$(overlay)))
+  oname := $(patsubst %nvidia-nx,%nvidia,$(lastword $(subst /, ,$(overlay))))
   srcdir.$(oname) := $(srctree.$(oname))/$(obj)
 endef
 $(foreach overlay,$(KERNEL_OVERLAYS),$(eval $(value set_srcdir_overlay)))
@@ -28,7 +28,7 @@ subdirs       := $(patsubst $(srcdir)/%/,%,\
 		 $(filter-out $(srcdir)/,\
 		 $(sort $(dir $(wildcard $(srcdir)/*/)))))
 define set_subdirs_overlay
-  oname := $(lastword $(subst /, ,$(overlay)))
+  oname := $(patsubst %nvidia-nx,%nvidia,$(lastword $(subst /, ,$(overlay))))
   subdirs += $(patsubst $(srcdir.$(oname))/%/,%,\
 		 $(filter-out $(srcdir.$(oname))/,\
 		 $(sort $(dir $(wildcard $(srcdir.$(oname))/*/)))))
@@ -65,7 +65,7 @@ header-files  := $(notdir $(wildcard $(srcdir)/*.h))
 header-files  += $(notdir $(wildcard $(srcdir)/*.agh))
 header-files  := $(filter-out $(no-export-headers), $(header-files))
 define set_header_files_overlay
-  oname := $(lastword $(subst /, ,$(overlay)))
+  oname := $(patsubst %nvidia-nx,%nvidia,$(lastword $(subst /, ,$(overlay))))
   header-files.$(oname) := $(notdir $(wildcard $(srcdir.$(oname))/*.h))
   header-files.$(oname) += $(notdir $(wildcard $(srcdir.$(oname))/*.agh))
   header-files.$(oname) := $(filter-out $(no-export-headers), $(header-files.$(oname)))
@@ -87,7 +87,7 @@ wrapper-files := $(filter-out $(header-files), $(wrapper-files))
 # all headers files for this dir
 all-files     := $(header-files) $(genhdr-files) $(wrapper-files)
 define set_all_files_overlay
-  oname := $(lastword $(subst /, ,$(overlay)))
+  oname := $(patsubst %nvidia-nx,%nvidia,$(lastword $(subst /, ,$(overlay))))
   all-files += $(header-files.$(oname))
 endef
 $(foreach overlay,$(KERNEL_OVERLAYS),$(eval $(value set_all_files_overlay)))
@@ -111,7 +111,7 @@ printdir = $(patsubst $(INSTALL_HDR_PATH)/%/,%,$(dir $@))
 
 cmd_install_overlays :=
 define set_cmd_install_overlay
-  oname := $(lastword $(subst /, ,$(overlay)))
+  oname := $(patsubst %nvidia-nx,%nvidia,$(lastword $(subst /, ,$(overlay))))
   ifneq ($(header-files.$(oname)),)
     cmd_install_overlays += $(CONFIG_SHELL) $(srctree)/scripts/headers_install.sh $(installdir) $(srcdir.$(oname)) $(header-files.$(oname));
   endif
@@ -149,7 +149,7 @@ __headers: $(install-file)
 install_file_deps := $(addprefix $(srcdir)/,$(header-files)) 
 install_file_deps += $(addprefix $(gendir)/,$(genhdr-files))
 define set_install_file_deps_overlay
-  oname := $(lastword $(subst /, ,$(overlay)))
+  oname := $(patsubst %nvidia-nx,%nvidia,$(lastword $(subst /, ,$(overlay))))
   install_file_deps += $(addprefix $(srcdir.$(oname))/,$(header-files.$(oname))) 
 endef
 $(foreach overlay,$(KERNEL_OVERLAYS),$(eval $(value set_install_file_deps_overlay)))
