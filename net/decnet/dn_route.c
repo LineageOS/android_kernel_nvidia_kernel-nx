@@ -115,7 +115,7 @@ static unsigned int dn_dst_default_advmss(const struct dst_entry *dst);
 static unsigned int dn_dst_mtu(const struct dst_entry *dst);
 static void dn_dst_destroy(struct dst_entry *);
 static void dn_dst_ifdown(struct dst_entry *, struct net_device *dev, int how);
-static struct dst_entry *dn_dst_negative_advice(struct dst_entry *);
+static void dn_dst_negative_advice(struct sock *sk, struct dst_entry *);
 static void dn_dst_link_failure(struct sk_buff *);
 static void dn_dst_update_pmtu(struct dst_entry *dst, struct sock *sk,
 			       struct sk_buff *skb , u32 mtu);
@@ -144,7 +144,7 @@ static struct dst_ops dn_dst_ops = {
 	.cow_metrics =		dst_cow_metrics_generic,
 	.destroy =		dn_dst_destroy,
 	.ifdown =		dn_dst_ifdown,
-	.negative_advice =	dn_dst_negative_advice,
+	.negative_advice =	(android_dst_ops_negative_advice_old_t)dn_dst_negative_advice,
 	.link_failure =		dn_dst_link_failure,
 	.update_pmtu =		dn_dst_update_pmtu,
 	.redirect =		dn_dst_redirect,
@@ -303,10 +303,9 @@ static struct dst_entry *dn_dst_check(struct dst_entry *dst, __u32 cookie)
 	return NULL;
 }
 
-static struct dst_entry *dn_dst_negative_advice(struct dst_entry *dst)
+static void dn_dst_negative_advice(struct sock *sk, struct dst_entry *dst)
 {
-	dst_release(dst);
-	return NULL;
+	sk_dst_reset(sk);
 }
 
 static void dn_dst_link_failure(struct sk_buff *skb)
