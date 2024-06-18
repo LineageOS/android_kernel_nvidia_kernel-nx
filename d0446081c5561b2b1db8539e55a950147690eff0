@@ -16,6 +16,24 @@
       "message": "need to figure out if we need",
       "revId": "d0446081c5561b2b1db8539e55a950147690eff0",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c4dc5df2_8cf59dc8",
+        "filename": "arch/arm64/configs/tegra_android_defconfig",
+        "patchSetId": 4
+      },
+      "lineNbr": 819,
+      "author": {
+        "id": 16185
+      },
+      "writtenOn": "2024-06-18T16:20:21Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "bba4ad37_4ebdb61c",
+      "revId": "d0446081c5561b2b1db8539e55a950147690eff0",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
