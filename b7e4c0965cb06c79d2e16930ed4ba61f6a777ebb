@@ -1,0 +1,72 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "6375fa07_019924a9",
+        "filename": "arch/arm64/configs/tegra_android_defconfig",
+        "patchSetId": 4
+      },
+      "lineNbr": 50,
+      "author": {
+        "id": 16185
+      },
+      "writtenOn": "2024-06-18T16:08:12Z",
+      "side": 0,
+      "message": "thinking on this one",
+      "revId": "b7e4c0965cb06c79d2e16930ed4ba61f6a777ebb",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "dcf9367d_ab47614b",
+        "filename": "arch/arm64/configs/tegra_android_defconfig",
+        "patchSetId": 4
+      },
+      "lineNbr": 235,
+      "author": {
+        "id": 16185
+      },
+      "writtenOn": "2024-06-18T16:08:12Z",
+      "side": 0,
+      "message": "whole section - maybe leave in place?",
+      "revId": "b7e4c0965cb06c79d2e16930ed4ba61f6a777ebb",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "46cd8376_9a417638",
+        "filename": "arch/arm64/configs/tegra_android_defconfig",
+        "patchSetId": 4
+      },
+      "lineNbr": 643,
+      "author": {
+        "id": 16185
+      },
+      "writtenOn": "2024-06-18T16:08:12Z",
+      "side": 0,
+      "message": "likely not needed?",
+      "revId": "b7e4c0965cb06c79d2e16930ed4ba61f6a777ebb",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "41ca970c_2948dce1",
+        "filename": "arch/arm64/configs/tegra_android_defconfig",
+        "patchSetId": 4
+      },
+      "lineNbr": 855,
+      "author": {
+        "id": 16185
+      },
+      "writtenOn": "2024-06-18T16:08:12Z",
+      "side": 0,
+      "message": "whoops",
+      "revId": "b7e4c0965cb06c79d2e16930ed4ba61f6a777ebb",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
