@@ -53,6 +53,24 @@
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "bd1044b9_974f7c63",
+        "filename": "arch/arm64/configs/tegra_android_defconfig",
+        "patchSetId": 4
+      },
+      "lineNbr": 235,
+      "author": {
+        "id": 16185
+      },
+      "writtenOn": "2024-06-18T16:30:16Z",
+      "side": 0,
+      "message": "Done",
+      "parentUuid": "dcf9367d_ab47614b",
+      "revId": "b7e4c0965cb06c79d2e16930ed4ba61f6a777ebb",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "46cd8376_9a417638",
@@ -66,6 +84,24 @@
       "writtenOn": "2024-06-18T16:08:12Z",
       "side": 0,
       "message": "likely not needed?",
+      "revId": "b7e4c0965cb06c79d2e16930ed4ba61f6a777ebb",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "877f559b_8d2c3cf8",
+        "filename": "arch/arm64/configs/tegra_android_defconfig",
+        "patchSetId": 4
+      },
+      "lineNbr": 643,
+      "author": {
+        "id": 16185
+      },
+      "writtenOn": "2024-06-18T16:30:16Z",
+      "side": 0,
+      "message": "Done",
+      "parentUuid": "46cd8376_9a417638",
       "revId": "b7e4c0965cb06c79d2e16930ed4ba61f6a777ebb",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     },
