@@ -373,7 +373,7 @@ void tegra_pmc_writel_relaxed(u32 value, unsigned long offset);
 u32 tegra_pmc_readl(unsigned long offset);
 void tegra_pmc_writel(u32 value, unsigned long offset);
 
-ulong pmc_send_smc(u32 func, struct pmc_smc_regs *regs);
+void pmc_send_smc(u32 func, struct pmc_smc_regs *regs);
 
 struct tegra_br_cmd_cfg {
 	u32 dev;
