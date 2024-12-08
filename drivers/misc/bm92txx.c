@@ -123,7 +123,9 @@
 
 /* DP_STATUS_REG */
 #define DP_STATUS_PIN_CFG_DONE BIT(1) /* Pin configured or sth */
+////bit 3 and 4 are after dp enter cmd (aka dp discover)
 #define DP_STATUS_SIGNAL_ON    BIT(7) /* TV/Monitor connected. link channel enabled or hpd channel or something */
+////bit 8 is weird
 #define DP_STATUS_INSERT       BIT(14)
 #define DP_STATUS_DP_EN        BIT(15)
 
@@ -728,17 +730,35 @@ static int bm92t_handle_dp_config_and_hpd(struct bm92t_info *info)
 				0x00, 0x00, 0x00};
 	union extcon_property_value prop;
 
-	/* Set primary pin assignment by lanes supported */
-	unsigned char pin_cfg = (info->pdata->dp_lanes == 4) ?
-				VDO_DP_PIN_C : VDO_DP_PIN_D;
-
 	/* Read DisplayPort Capabilities */
 	err = bm92t_read_reg(info, INCOMING_VDM_REG, msg, sizeof(msg));
 	dev_info(&info->i2c_client->dev,
 		 "DP Pin assignments: %02X %02X\n", msg[2], msg[3]);
 
 	/* Prepare UFP_U as UFP_D configuration */
-	for (i = 0; i < 2; i++) {
+	for (i = 0; i < 4; i++) {
+		unsigned char pin_cfg = 0;
+
+		/* Try pin assignments by lanes supported */
+		switch (i) {
+		case 0: /* Try primary pin assignment */
+			pin_cfg = (info->pdata->dp_lanes == 4) ?
+				  VDO_DP_PIN_C : VDO_DP_PIN_D;
+			break;
+		case 1: /* Try secondary pin assignment */
+			pin_cfg = (info->pdata->dp_lanes == 4) ?
+				  VDO_DP_PIN_D : VDO_DP_PIN_C;
+			break;
+		case 2: /* Try primary adapter pin assignment */
+			pin_cfg = (info->pdata->dp_lanes == 4) ?
+				  VDO_DP_PIN_E : VDO_DP_PIN_F;
+			break;
+		case 3: /* Try secondary adapter pin assignment */
+			pin_cfg = (info->pdata->dp_lanes == 4) ?
+				  VDO_DP_PIN_F : VDO_DP_PIN_E;
+			break;
+		}
+
 		if (info->cable.is_nintendo_dock) {
 			/* Dock reports Plug but uses Receptacle */
 			/* Both plug & receptacle pin assignment work, */
@@ -746,7 +766,8 @@ static int bm92t_handle_dp_config_and_hpd(struct bm92t_info *info)
 			if (msg[3] & pin_cfg) {
 				cfg[3] = 0x00;
 				cfg[4] = pin_cfg;
-				valid_lanes = pin_cfg == VDO_DP_PIN_C ? 4 : 2;
+				valid_lanes = (pin_cfg == VDO_DP_PIN_C) ||
+					      (pin_cfg == VDO_DP_PIN_E) ? 4 : 2;
 				break;
 			}
 		} else if (!(msg[1] & VDO_DP_RECEPTACLE)) { /* Plug */
@@ -754,7 +775,8 @@ static int bm92t_handle_dp_config_and_hpd(struct bm92t_info *info)
 			if (msg[2] & pin_cfg) {
 				cfg[3] = pin_cfg;
 				cfg[4] = 0x00;
-				valid_lanes = pin_cfg == VDO_DP_PIN_C ? 4 : 2;
+				valid_lanes = (pin_cfg == VDO_DP_PIN_C) ||
+					      (pin_cfg == VDO_DP_PIN_E) ? 4 : 2;
 				break;
 			}
 		} else if (msg[1] & VDO_DP_RECEPTACLE) { /* Receptacle */
@@ -762,17 +784,14 @@ static int bm92t_handle_dp_config_and_hpd(struct bm92t_info *info)
 			if (msg[3] & pin_cfg) {
 				cfg[3] = pin_cfg;
 				cfg[4] = 0x00;
-				valid_lanes = pin_cfg == VDO_DP_PIN_C ? 4 : 2;
+				valid_lanes = (pin_cfg == VDO_DP_PIN_C) ||
+					      (pin_cfg == VDO_DP_PIN_E) ? 4 : 2;
 				break;
 			}
 		}
-
-		/* Try secondary pin assignment */
-		pin_cfg = (info->pdata->dp_lanes == 4) ?
-			  VDO_DP_PIN_D : VDO_DP_PIN_C;
 	}
 
-	/* Check that UFP_U/UFP_D Pin D assignment is supported */
+	/* Check that UFP_U/UFP_D Pin assignment is supported */
 	if (!err && msg[0] == 4 && valid_lanes) {
 		/* Send DisplayPort Configuration */
 		err = bm92t_write_reg(info, (unsigned char *) cfg, sizeof(cfg));
@@ -1544,7 +1563,6 @@ init_contract_out:
 
 	case PS_RDY_SENT:
 		if (bm92t_is_success(alert_data)) {
-			bm92t_extcon_cable_update(info, EXTCON_USB_HOST, true);
 			schedule_delayed_work(&info->power_work,
 					      msecs_to_jiffies(2000));
 
@@ -1561,6 +1579,7 @@ init_contract_out:
 				bm92t_state_machine(info, DR_SWAP_SENT);
 			} else if (bm92t_is_dfp(status1_data)) {
 				dev_dbg(dev, "Already in DFP mode\n");
+				bm92t_extcon_cable_update(info, EXTCON_USB_HOST, true);
 				bm92t_send_vdm(info, vdm_discover_id_msg,
 					       sizeof(vdm_discover_id_msg));
 				bm92t_state_machine(info, VDM_DISC_ID_SENT);
@@ -1573,14 +1592,15 @@ init_contract_out:
 		    bm92t_is_plugged(status1_data) &&
 		    bm92t_is_lastcmd_ok(info, "DR_SWAP_CMD", status1_data) &&
 		    bm92t_is_dfp(status1_data)) {
+			dev_dbg(dev, "Switched to DFP mode\n");
+			bm92t_extcon_cable_update(info, EXTCON_USB_HOST, true);
 			bm92t_send_vdm(info, vdm_discover_id_msg,
 				       sizeof(vdm_discover_id_msg));
 			bm92t_state_machine(info, VDM_DISC_ID_SENT);
 		} else if (bm92t_is_plugged(status1_data) &&
-			   bm92t_lastcmd_status(status1_data) ==
-							     LASTCMD_REJECTED) {
+			   bm92t_lastcmd_status(status1_data) !=
+							     LASTCMD_COMPLETE) {
 			/* UFP rejected data role swap. */
-			bm92t_extcon_cable_update(info, EXTCON_USB_HOST, false);
 			bm92t_extcon_cable_update(info, EXTCON_USB, true);
 			bm92t_state_machine(info, INIT_STATE);
 		}
