@@ -13,6 +13,8 @@
 #ifndef _DEVICE_H_
 #define _DEVICE_H_
 
+#define DEBUG 1
+
 #include <linux/ioport.h>
 #include <linux/kobject.h>
 #include <linux/klist.h>

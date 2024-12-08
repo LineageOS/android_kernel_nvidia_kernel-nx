@@ -1,6 +1,8 @@
 #ifndef __KERNEL_PRINTK__
 #define __KERNEL_PRINTK__
 
+#define DEBUG 1
+
 #include <stdarg.h>
 #include <linux/init.h>
 #include <linux/kern_levels.h>

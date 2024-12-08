@@ -381,7 +381,7 @@
 
 #define PCIE_LANES_X4_X1		0x14
 
-#define DEBUG 0
+//#define DEBUG 0
 #if DEBUG || defined(CONFIG_PCI_DEBUG)
 #define PR_FUNC_LINE	pr_info("PCIE: %s(%d)\n", __func__, __LINE__)
 #else
