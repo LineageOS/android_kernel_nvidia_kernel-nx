@@ -951,7 +951,7 @@ KBUILD_CFLAGS   += $(ARCH_CFLAGS)   $(KCFLAGS)
 ifeq ($(cc-name),clang)
 KBUILD_CFLAGS += -fno-builtin-bcmp -Wno-parentheses-equality -Wno-varargs -Wno-typedef-redefinition -Wno-self-assign -Wno-enum-conversion \
                -Wno-pointer-bool-conversion -Wno-constant-conversion -Wno-non-literal-null-conversion -Wno-tentative-definition-incomplete-type \
-               -Wframe-larger-than=4096 -Wno-deprecated-declarations -Wno-shift-count-negative
+               -Wframe-larger-than=4096 -Wno-deprecated-declarations -Wno-shift-count-negative -mharden-sls=all
 endif
 
 # Use --build-id when available.
