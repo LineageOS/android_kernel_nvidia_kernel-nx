@@ -2,7 +2,9 @@
  *  linux/fs/attr.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
+ *  Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
  *  changes by Thomas Schoebel-Theuer
+ *
  */
 
 #include <linux/export.h>
@@ -15,6 +17,32 @@
 #include <linux/security.h>
 #include <linux/evm.h>
 #include <linux/ima.h>
+
+#define AID_REMOTE_WRITE 2902 /* remote storage write access */
+
+/**
+ * task_in_nvremote_group - check if current task supplement groups
+ * include AID_NVREMOTE_WRITE
+ *
+ * Return true if current task has suuplement group AID_NVREMOTE_WRITE
+ */
+static bool task_in_nvremote_group(void)
+{
+	struct group_info *group_info;
+	bool in_nvremote_group = false;
+	int i;
+
+	group_info = get_current_groups();
+	for (i = 0; i < group_info->ngroups; i++) {
+		if (group_info->gid[i].val == AID_REMOTE_WRITE) {
+			in_nvremote_group = true;
+			break;
+		}
+	}
+	put_group_info(group_info);
+
+	return in_nvremote_group;
+}
 
 /**
  * setattr_prepare - check if attribute changes to a dentry are allowed
@@ -76,8 +104,12 @@ int setattr_prepare(struct dentry *dentry, struct iattr *attr)
 
 	/* Check for setting the inode time. */
 	if (ia_valid & (ATTR_MTIME_SET | ATTR_ATIME_SET | ATTR_TIMES_SET)) {
-		if (!inode_owner_or_capable(inode))
-			return -EPERM;
+		if (!inode_owner_or_capable(inode)) {
+			if ((inode->i_gid.val != AID_REMOTE_WRITE) ||
+			    (task_in_nvremote_group() == false)) {
+				return -EPERM;
+			}
+		}
 	}
 
 kill_priv:
