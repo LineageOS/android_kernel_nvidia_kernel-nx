@@ -17,6 +17,7 @@ proc-y	+= cpuinfo.o
 proc-y	+= devices.o
 proc-y	+= interrupts.o
 proc-y	+= loadavg.o
+CFLAGS_meminfo.o += -DCONFIG_TEGRA_NVMAP
 proc-y	+= meminfo.o
 proc-y	+= stat.o
 proc-y	+= uptime.o
