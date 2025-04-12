@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+config INV_ICM42607P
+	tristate
+	select IIO_BUFFER
+	help
+	  Core support for the InvenSense ICM-42607P motion tracking device.
+
+config INV_ICM42607P_SPI
+	tristate "InvenSense ICM-42607P SPI driver"
+	depends on SPI_MASTER
+	select INV_ICM42607P
+	select REGMAP_SPI
+	help
+	  This driver supports the InvenSense ICM-42607P motion tracking
+	  device over SPI, specifically optimized for the Nintendo Switch ODDLED
+	  (Yes im calling it that).
+
+	  This driver can be built as a module. The module will be called
+	  inv-icm42607p-spi.
