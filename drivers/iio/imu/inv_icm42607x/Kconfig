@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+config INV_ICM42607X
+	tristate
+	select IIO_BUFFER
+	help
+	  Core support for the InvenSense ICM-42607P motion tracking device.
+
+config INV_ICM42607X_SPI
+	tristate "InvenSense ICM-42607X SPI driver"
+	depends on SPI_MASTER
+	select INV_ICM42607X
+	select REGMAP_SPI
+	help
+	  This driver supports the InvenSense ICM-42607X motion tracking
+	  device over SPI.
+
+	  This driver can be built as a module. The module will be called
+	  inv-icm42607x-spi.
