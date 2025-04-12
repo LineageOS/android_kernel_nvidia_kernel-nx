@@ -48,21 +48,175 @@ static int inv_icm42600_spi_bus_setup(struct inv_icm42600_state *st)
 				  INV_ICM42600_INTF_CONFIG0_UI_SIFS_CFG_I2C_DIS);
 }
 
+static int inv_icm42600_find_compat(struct spi_device *spi,
+	const struct of_device_id **of_id)
+{
+	const struct of_device_id *id;
+	int hw_id;
+
+	while (true) {
+		id = *of_id;
+		if (!id->compatible || !id->compatible[0]) {
+			dev_err(&spi->dev, "Failed to probe compatible device\n");
+			return -ENODEV;
+		}
+		if (of_device_is_compatible(spi->dev.of_node, id->compatible)) {
+			dev_info(&spi->dev, "Probing %s\n", id->compatible);
+			hw_id = (int)(uintptr_t)id->data;
+			break;
+		}
+		(*of_id)++;
+	}
+	(*of_id)++;
+
+	return hw_id;
+}
+
 static int inv_icm42600_probe(struct spi_device *spi)
 {
-	const struct spi_device_id *id = spi_get_device_id(spi);
-	int hw_id = id->driver_data;
-	enum inv_icm42600_chip chip;
-	struct regmap *regmap;
+    const struct spi_driver *sdrv;
+    const struct of_device_id *of_id;
+    const struct spi_device_id *id;
+    bool multi_driver = false;
+    enum inv_icm42600_chip chip;
+    struct regmap *regmap;
+    int res, hw_id;
 
-	chip = (enum inv_icm42600_chip)hw_id;
+    // --- START DEBUG ---
+    // Check spi pointer itself (should never be NULL here)
+    if (!spi) {
+        pr_err("inv_icm42600_probe: FATAL: spi pointer is NULL!\n");
+        return -EINVAL; // Should not happen
+    }
+    // Use dev_info which includes device context
+    dev_info(&spi->dev, "Probe START: spi=%p\n", spi);
 
-	regmap = devm_regmap_init_spi(spi, &inv_icm42600_regmap_config);
-	if (IS_ERR(regmap))
-		return PTR_ERR(regmap);
+    // Check essential pointers within spi and spi->dev
+    dev_info(&spi->dev, "Probe: &spi->dev=%p\n", &spi->dev);
+    dev_info(&spi->dev, "Probe: spi->dev.driver=%p\n", spi->dev.driver);
+    dev_info(&spi->dev, "Probe: spi->dev.of_node=%p\n", spi->dev.of_node);
+    dev_info(&spi->dev, "Probe: spi->modalias=%s\n", spi->modalias ? spi->modalias : "NULL");
+    dev_info(&spi->dev, "Probe: spi->irq=%d\n", spi->irq);
+    // --- END DEBUG ---
 
-	return inv_icm42600_core_probe(regmap, chip, spi->irq,
-				       inv_icm42600_spi_bus_setup);
+    sdrv = to_spi_driver(spi->dev.driver);
+    // --- START DEBUG ---
+    dev_info(&spi->dev, "Probe: sdrv=%p\n", sdrv);
+    if (!sdrv) {
+         dev_err(&spi->dev, "Probe: sdrv (driver) pointer is NULL!\n");
+         // Decide if this is fatal, depends on subsequent code
+         // return -EINVAL; // Potentially return error if sdrv is needed immediately
+    } else {
+        dev_info(&spi->dev, "Probe: sdrv->driver.of_match_table=%p\n", sdrv->driver.of_match_table);
+        // Check if of_match_table is NULL *before* assigning to of_id
+        if (!sdrv->driver.of_match_table) {
+            dev_warn(&spi->dev, "Probe: sdrv->driver.of_match_table is NULL!\n");
+        }
+    }
+    // --- END DEBUG ---
+    of_id = sdrv->driver.of_match_table; // Original line
+    // --- START DEBUG ---
+    dev_info(&spi->dev, "Probe: of_id=%p\n", of_id);
+    // --- END DEBUG ---
+
+
+    id = spi_get_device_id(spi);
+    // --- START DEBUG ---
+    dev_info(&spi->dev, "Probe: id=%p\n", id);
+    // --- END DEBUG ---
+
+
+    if (!id) {
+        // --- START DEBUG ---
+        dev_info(&spi->dev, "Probe: No SPI device ID found, checking modalias.\n");
+        if (spi->modalias) { // Check modalias before strcmp
+             // --- END DEBUG ---
+             if (!strcmp(spi->modalias, "multi-driver")) {
+                 // --- START DEBUG ---
+                 dev_info(&spi->dev, "Probe: multi-driver modalias detected.\n");
+                 // --- END DEBUG ---
+                 multi_driver = true;
+             } else {
+                 dev_err(&spi->dev, "Failed to get spi id: %s\n",
+                         spi->modalias);
+                 return -ENODEV;
+             }
+        } else {
+             // --- START DEBUG ---
+             dev_err(&spi->dev, "Probe: spi->modalias is NULL when ID is NULL!\n");
+             // --- END DEBUG ---
+             return -ENODEV; // Can't identify device
+        }
+    } else {
+        // --- START DEBUG ---
+        dev_info(&spi->dev, "Probe: Got SPI device ID: name=%s, driver_data=0x%lx\n", id->name, id->driver_data);
+        // --- END DEBUG ---
+        hw_id = id->driver_data;
+    }
+
+    // --- START DEBUG ---
+    dev_info(&spi->dev, "Probe: Calling devm_regmap_init_spi...\n");
+    // --- END DEBUG ---
+    regmap = devm_regmap_init_spi(spi, &inv_icm42600_regmap_config);
+    // --- START DEBUG ---
+    // Check regmap BEFORE IS_ERR. IS_ERR handles NULL and error codes (-PTR_MAX_ERR .. -1)
+    // Printing it directly might show NULL or an ERR_PTR value.
+    dev_info(&spi->dev, "Probe: devm_regmap_init_spi returned: %p\n", regmap);
+    // --- END DEBUG ---
+    if (IS_ERR(regmap)) {
+        dev_err(&spi->dev, "Failed to register spi regmap %ld\n", // Use %ld for long
+                PTR_ERR(regmap));
+        return PTR_ERR(regmap);
+    }
+    // --- START DEBUG ---
+    dev_info(&spi->dev, "Probe: Regmap initialized successfully.\n");
+    // --- END DEBUG ---
+
+
+try_next: // Label for multi-driver loop
+    if (multi_driver) {
+        // --- START DEBUG ---
+        dev_info(&spi->dev, "Probe: multi-driver: finding compatible, of_id=%p\n", of_id);
+        // Check of_id before passing it to the function
+        if (!of_id) {
+             dev_err(&spi->dev, "Probe: multi-driver: of_id is NULL before calling find_compat!\n");
+             return -EINVAL; // Cannot proceed
+        }
+        // --- END DEBUG ---
+        hw_id = inv_icm42600_find_compat(spi, &of_id);
+        // --- START DEBUG ---
+        dev_info(&spi->dev, "Probe: multi-driver: find_compat returned hw_id=%d, new of_id=%p\n", hw_id, of_id);
+        // --- END DEBUG ---
+        if (hw_id < 0)
+            return hw_id;
+    }
+
+    chip = (enum inv_icm42600_chip)hw_id;
+    // --- START DEBUG ---
+    dev_info(&spi->dev, "Probe: Determined chip type: %d. Calling core_probe (irq=%d)...\n", (int)chip, spi->irq);
+    // --- END DEBUG ---
+
+    res = inv_icm42600_core_probe(regmap, chip, spi->irq,
+                                 inv_icm42600_spi_bus_setup);
+
+    // --- START DEBUG ---
+    dev_info(&spi->dev, "Probe: core_probe returned: %d\n", res);
+    // --- END DEBUG ---
+
+    if (multi_driver) {
+        if (res) {
+             // --- START DEBUG ---
+             dev_info(&spi->dev, "Probe: multi-driver: core_probe failed (%d), trying next compatible...\n", res);
+             // --- END DEBUG ---
+             goto try_next;
+        }
+        dev_info(&spi->dev, "Probed successfully via multi-driver\n"); // Changed from "Probed\n" for clarity
+    }
+
+    // --- START DEBUG ---
+    dev_info(&spi->dev, "Probe END: result=%d\n", res);
+    // --- END DEBUG ---
+    return res;
 }
 
 static const struct of_device_id inv_icm42600_of_matches[] = {
