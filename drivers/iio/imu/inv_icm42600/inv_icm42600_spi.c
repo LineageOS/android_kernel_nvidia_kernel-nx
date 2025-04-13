@@ -80,7 +80,7 @@ static int inv_icm42600_probe(struct spi_device *spi)
     bool multi_driver = false;
     enum inv_icm42600_chip chip;
     struct regmap *regmap;
-    int res, hw_id;
+    int res, hw_id = 0;
 
     // Check spi pointer itself (should never be NULL here)
     if (!spi) {
