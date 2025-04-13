@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "34f16fd8_fe5d7c93",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 4
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 27741
+      },
+      "writtenOn": "2025-04-13T17:16:30Z",
+      "side": 1,
+      "message": "one nitpick is i think 42607x should be 4267x\n42607 makes sense, 42670 makes sense, 4267x makes the most sense, the extra 0 seems funny",
+      "revId": "d04447cf896a23f04814177505e4b82063140aae",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "e3fbf1be_a3d1496a",
+        "filename": "arch/arm64/configs/tegra_android_defconfig",
+        "patchSetId": 4
+      },
+      "lineNbr": 802,
+      "author": {
+        "id": 27741
+      },
+      "writtenOn": "2025-04-13T17:16:30Z",
+      "side": 1,
+      "message": "42670x_SPI selects 42670x so they would not both show in defconfig\nyou can remove 42670x and it should work",
+      "revId": "d04447cf896a23f04814177505e4b82063140aae",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
