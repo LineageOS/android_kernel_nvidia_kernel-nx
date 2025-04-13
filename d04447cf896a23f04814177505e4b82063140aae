@@ -33,6 +33,24 @@
       "message": "42670x_SPI selects 42670x so they would not both show in defconfig\nyou can remove 42670x and it should work",
       "revId": "d04447cf896a23f04814177505e4b82063140aae",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c7f0b274_14d540ee",
+        "filename": "arch/arm64/configs/tegra_android_defconfig",
+        "patchSetId": 4
+      },
+      "lineNbr": 802,
+      "author": {
+        "id": 35144
+      },
+      "writtenOn": "2025-04-13T18:11:06Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "e3fbf1be_a3d1496a",
+      "revId": "d04447cf896a23f04814177505e4b82063140aae",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
