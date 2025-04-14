@@ -1301,7 +1301,8 @@ static void sio_parse_imu_report(struct joycon_ctlr *ctlr,
 	if (imu_type == SIO_IMU_NOTFOUND || !report_num)
 		return;
 
-	sio_input_report_parse_imu_data(ctlr, rep, imu_data, report_num);
+	if (idev)
+		sio_input_report_parse_imu_data(ctlr, rep, imu_data, report_num);
 
 	/*
 	 * Keeping track of the average report delta allows us to submit our
@@ -2114,8 +2115,10 @@ static void sio_set_imu_calibration(struct joycon_ctlr *ctlr)
 static int joycon_input_create(struct joycon_ctlr *ctlr)
 {
 	struct device *dev = &ctlr->sdev->dev;
+	struct device_node *np = dev->of_node;
 	enum joycon_ctlr_type type = ctlr->ctlr_type;
 	const char *name;
+	bool imu_enabled = true;
 	u16 pid = 0;
 	int ret;
 	int i;
@@ -2217,7 +2220,9 @@ static int joycon_input_create(struct joycon_ctlr *ctlr)
 	if (ret)
 		return ret;
 
-	if (ctlr->is_sio) {
+	imu_enabled = !of_property_read_bool(np, "imu-disable");
+
+	if (ctlr->is_sio && imu_enabled) {
 		/* Configure the imu input device */
 		ctlr->imu_input = devm_input_allocate_device(dev);
 		if (!ctlr->imu_input)
