@@ -44,6 +44,8 @@
 #include <linux/spinlock.h>
 #include <linux/tty.h>
 
+#define DEBUG 1
+
 /*
  * Reference the url below for the following protocol defines:
  * https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering
@@ -455,6 +457,30 @@ struct joycon_led_queue_item {
 	enum led_brightness brightness;
 };
 
+static const unsigned int joycon_button_inputs_left[] = {
+	BTN_SELECT, BTN_Z, BTN_THUMBL,
+	BTN_DPAD_UP, BTN_DPAD_DOWN, BTN_DPAD_LEFT, BTN_DPAD_RIGHT,
+	BTN_TL, BTN_TL2,
+	0 /* 0 signals end of array */
+};
+
+static const unsigned int joycon_button_inputs_right[] = {
+	BTN_START, BTN_MODE, BTN_THUMBR,
+	BTN_SOUTH, BTN_EAST, BTN_NORTH, BTN_WEST,
+	BTN_TR, BTN_TR2,
+	0 /* 0 signals end of array */
+};
+
+static const unsigned int joycon_button_inputs_sio[] = {
+	BTN_SELECT, BTN_Z, BTN_THUMBL,
+	BTN_DPAD_UP, BTN_DPAD_DOWN, BTN_DPAD_LEFT, BTN_DPAD_RIGHT,
+	BTN_TL, BTN_TL2,
+	BTN_START, BTN_MODE, BTN_THUMBR,
+	BTN_SOUTH, BTN_EAST, BTN_NORTH, BTN_WEST,
+	BTN_TR, BTN_TR2,
+	0 /* 0 signals end of array */
+};
+
 #define JC_MAX_RESP_SIZE		(sizeof(struct joycon_input_report) + 35)
 #define JC_MAX_UART_PKT_SIZE		(sizeof(struct joycon_uart_packet) + JC_MAX_RESP_SIZE)
 #define JC_NUM_LEDS			4
@@ -834,6 +860,7 @@ static int joycon_get_ctlr_info(struct joycon_ctlr *ctlr)
 	struct device *dev = &ctlr->sdev->dev;
 	struct joycon_input_report *report;
 	int ret;
+	int i;
 
 	req.subcmd_id = JC_SUBCMD_REQ_DEV_INFO;
 	ret = joycon_send_subcmd(ctlr, &req, 0, HZ);
@@ -842,20 +869,60 @@ static int joycon_get_ctlr_info(struct joycon_ctlr *ctlr)
 		return ret;
 	}
 
+	input_unregister_device(ctlr->input);
+
 	report = (struct joycon_input_report *)ctlr->input_buf;
 	switch (report->reply.data[2]) {
 	case 1:
 		ctlr->ctlr_type = JOYCON_TYPE_LEFT;
+		ctlr->input->id.product = 0x2006;
+		ctlr->input->name = "Nintendo Switch Left Joy-Con Serial";
 		dev_info(dev, "Detected left joy-con\n");
+
+		/* Analog stick */
+		input_set_abs_params(ctlr->input, ABS_X,
+				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
+				     JC_STICK_FUZZ, JC_STICK_FLAT);
+		input_set_abs_params(ctlr->input, ABS_Y,
+				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
+				     JC_STICK_FUZZ, JC_STICK_FLAT);
+
+		/* Set up buttons */
+		for (i = 0; joycon_button_inputs_left[i] > 0; i++)
+			input_set_capability(ctlr->input, EV_KEY,
+					     joycon_button_inputs_left[i]);
 		break;
 	case 2:
 		ctlr->ctlr_type = JOYCON_TYPE_RIGHT;
+		ctlr->input->id.product = 0x2007;
+		ctlr->input->name = "Nintendo Switch Right Joy-Con Serial";
 		dev_info(dev, "Detected right joy-con\n");
+		/* Analog stick */
+		input_set_abs_params(ctlr->input, ABS_RX,
+				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
+				     JC_STICK_FUZZ, JC_STICK_FLAT);
+		input_set_abs_params(ctlr->input, ABS_RY,
+				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
+				     JC_STICK_FUZZ, JC_STICK_FLAT);
+
+		/* Set up buttons */
+		for (i = 0; joycon_button_inputs_right[i] > 0; i++)
+			input_set_capability(ctlr->input, EV_KEY,
+					     joycon_button_inputs_right[i]);
 		break;
 	default:
 		dev_err(dev, "Invalid joy-con type = %u\n",
 			report->reply.data[2]);
 		return -EINVAL;
+	}
+
+	input_set_drvdata(ctlr->input, ctlr);
+
+	msleep(100);
+	ret = input_register_device(ctlr->input);
+	if (ret) {
+		dev_err(dev, "Failed to reregister joy-con during handshake\n");
+		return ret;
 	}
 
 	return 0;
@@ -1595,17 +1662,6 @@ static void joycon_disconnect(struct joycon_ctlr *ctlr)
 	ctlr->ctlr_state = JOYCON_CTLR_STATE_INIT;
 	spin_unlock_irqrestore(&ctlr->lock, flags);
 
-	dev_info(dev, "Removing input device\n");
-	/* Remove input imu device */
-	if (ctlr->imu_input) {
-		input_unregister_device(ctlr->imu_input);
-		ctlr->imu_input = NULL;
-	}
-	/* Remove input device */
-	if (ctlr->input) {
-		input_unregister_device(ctlr->input);
-		ctlr->input = NULL;
-	}
 	if (ctlr->mac_addr_str) {
 		devm_kfree(dev, ctlr->mac_addr_str);
 		ctlr->mac_addr_str = NULL;
@@ -2059,30 +2115,6 @@ static int joycon_play_effect(struct input_dev *dev, void *data,
 }
 #endif /* IS_ENABLED(CONFIG_JOYCON_SERDEV_FF) */
 
-static const unsigned int joycon_button_inputs_left[] = {
-	BTN_SELECT, BTN_Z, BTN_THUMBL,
-	BTN_DPAD_UP, BTN_DPAD_DOWN, BTN_DPAD_LEFT, BTN_DPAD_RIGHT,
-	BTN_TL, BTN_TL2,
-	0 /* 0 signals end of array */
-};
-
-static const unsigned int joycon_button_inputs_right[] = {
-	BTN_START, BTN_MODE, BTN_THUMBR,
-	BTN_SOUTH, BTN_EAST, BTN_NORTH, BTN_WEST,
-	BTN_TR, BTN_TR2,
-	0 /* 0 signals end of array */
-};
-
-static const unsigned int joycon_button_inputs_sio[] = {
-	BTN_SELECT, BTN_Z, BTN_THUMBL,
-	BTN_DPAD_UP, BTN_DPAD_DOWN, BTN_DPAD_LEFT, BTN_DPAD_RIGHT,
-	BTN_TL, BTN_TL2,
-	BTN_START, BTN_MODE, BTN_THUMBR,
-	BTN_SOUTH, BTN_EAST, BTN_NORTH, BTN_WEST,
-	BTN_TR, BTN_TR2,
-	0 /* 0 signals end of array */
-};
-
 static const s16 DFLT_ACCEL_OFFSET = 0;
 static const s16 DFLT_ACCEL_SCALE = 16384;
 static const s16 DFLT_GYRO_OFFSET = 0;
@@ -2115,167 +2147,25 @@ static void sio_set_imu_calibration(struct joycon_ctlr *ctlr)
 static int joycon_input_create(struct joycon_ctlr *ctlr)
 {
 	struct device *dev = &ctlr->sdev->dev;
-	struct device_node *np = dev->of_node;
-	enum joycon_ctlr_type type = ctlr->ctlr_type;
-	const char *name;
-	bool imu_enabled = true;
-	u16 pid = 0;
 	int ret;
-	int i;
 
-	switch (type) {
-	case JOYCON_TYPE_LEFT:
-		name = "Nintendo Switch Left Joy-Con Serial";
-		pid = 0x2006;
-		break;
-	case JOYCON_TYPE_RIGHT:
-		name = "Nintendo Switch Right Joy-Con Serial";
-		pid = 0x2007;
-		break;
-	case JOYCON_TYPE_SIO:
-		name = "Nintendo Switch Lite Gamepad";
-		pid = 0xF123; /* Custom PID */
-		break;
-	default: /* Should be impossible */
-		dev_err(dev, "Invalid Joy-con type\n");
-		return -EINVAL;
-	}
+	dev_info(dev, "setting data\n");
 
 	ctlr->input = devm_input_allocate_device(dev);
 	if (!ctlr->input)
 		return -ENOMEM;
 	ctlr->input->id.bustype = BUS_VIRTUAL;
 	ctlr->input->id.vendor = 0x57e;
-	ctlr->input->id.product = pid;
+	ctlr->input->id.product = 0; // fake, just rails for now
 	ctlr->input->id.version = 0;
-	ctlr->input->name = name;
 	ctlr->input->uniq = ctlr->mac_addr_str;
 	input_set_drvdata(ctlr->input, ctlr);
 
-	/* Set up inputs */
-	if (type == JOYCON_TYPE_LEFT) {
-		/* Analog stick */
-		input_set_abs_params(ctlr->input, ABS_X,
-				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
-				     JC_STICK_FUZZ, JC_STICK_FLAT);
-		input_set_abs_params(ctlr->input, ABS_Y,
-				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
-				     JC_STICK_FUZZ, JC_STICK_FLAT);
-
-		/* Set up buttons */
-		for (i = 0; joycon_button_inputs_left[i] > 0; i++)
-			input_set_capability(ctlr->input, EV_KEY,
-					     joycon_button_inputs_left[i]);
-	} else if (type == JOYCON_TYPE_RIGHT) {
-		/* Analog stick */
-		input_set_abs_params(ctlr->input, ABS_RX,
-				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
-				     JC_STICK_FUZZ, JC_STICK_FLAT);
-		input_set_abs_params(ctlr->input, ABS_RY,
-				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
-				     JC_STICK_FUZZ, JC_STICK_FLAT);
-
-		/* Set up buttons */
-		for (i = 0; joycon_button_inputs_right[i] > 0; i++)
-			input_set_capability(ctlr->input, EV_KEY,
-					     joycon_button_inputs_right[i]);
-	} else if (type == JOYCON_TYPE_SIO) {
-		/* Left analog stick */
-		input_set_abs_params(ctlr->input, ABS_X,
-				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
-				     JC_STICK_FUZZ, JC_STICK_FLAT);
-		input_set_abs_params(ctlr->input, ABS_Y,
-				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
-				     JC_STICK_FUZZ, JC_STICK_FLAT);
-		/* Right analog stick */
-		input_set_abs_params(ctlr->input, ABS_RX,
-				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
-				     JC_STICK_FUZZ, JC_STICK_FLAT);
-		input_set_abs_params(ctlr->input, ABS_RY,
-				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
-				     JC_STICK_FUZZ, JC_STICK_FLAT);
-
-		/* Set up buttons */
-		for (i = 0; joycon_button_inputs_sio[i] > 0; i++)
-			input_set_capability(ctlr->input, EV_KEY,
-					     joycon_button_inputs_sio[i]);
-	}
-
-#if IS_ENABLED(CONFIG_JOYCON_SERDEV_FF)
-	/* Set up rumble */
-	if (!ctlr->is_hori && !ctlr->is_sio) {
-		input_set_capability(ctlr->input, EV_FF, FF_RUMBLE);
-		input_ff_create_memless(ctlr->input, NULL, joycon_play_effect);
-		ctlr->rumble_ll_freq = JC_RUMBLE_DFLT_LOW_FREQ;
-		ctlr->rumble_lh_freq = JC_RUMBLE_DFLT_HIGH_FREQ;
-		ctlr->rumble_rl_freq = JC_RUMBLE_DFLT_LOW_FREQ;
-		ctlr->rumble_rh_freq = JC_RUMBLE_DFLT_HIGH_FREQ;
-		joycon_clamp_rumble_freqs(ctlr);
-		joycon_set_rumble(ctlr, 0, 0, false);
-		ctlr->rumble_msecs = jiffies_to_msecs(jiffies);
-	}
-#endif
+	dev_info(dev, "register\n");
 
 	ret = input_register_device(ctlr->input);
 	if (ret)
 		return ret;
-
-	imu_enabled = !of_property_read_bool(np, "imu-disable");
-
-	if (ctlr->is_sio && imu_enabled) {
-		/* Configure the imu input device */
-		ctlr->imu_input = devm_input_allocate_device(dev);
-		if (!ctlr->imu_input)
-			return -ENOMEM;
-
-		/* Set calibration data */
-		sio_set_imu_calibration(ctlr);
-
-		ctlr->imu_input->dev.parent = dev;
-		ctlr->imu_input->id.bustype = BUS_VIRTUAL;
-		ctlr->imu_input->id.vendor = 0x57e;
-		ctlr->imu_input->id.product = pid;
-		ctlr->imu_input->id.version = 0;
-		ctlr->imu_input->uniq = ctlr->mac_addr_str;
-		ctlr->imu_input->name = "Nintendo Switch Lite Gamepad IMU";
-		input_set_drvdata(ctlr->imu_input, ctlr);
-
-		/* Configure imu axes */
-		input_set_abs_params(ctlr->imu_input, ABS_X,
-				     -JC_IMU_MAX_ACCEL_MAG, JC_IMU_MAX_ACCEL_MAG,
-				     JC_IMU_ACCEL_FUZZ, JC_IMU_ACCEL_FLAT);
-		input_set_abs_params(ctlr->imu_input, ABS_Y,
-				     -JC_IMU_MAX_ACCEL_MAG, JC_IMU_MAX_ACCEL_MAG,
-				     JC_IMU_ACCEL_FUZZ, JC_IMU_ACCEL_FLAT);
-		input_set_abs_params(ctlr->imu_input, ABS_Z,
-				     -JC_IMU_MAX_ACCEL_MAG, JC_IMU_MAX_ACCEL_MAG,
-				     JC_IMU_ACCEL_FUZZ, JC_IMU_ACCEL_FLAT);
-		input_abs_set_res(ctlr->imu_input, ABS_X, JC_IMU_ACCEL_RES_PER_G);
-		input_abs_set_res(ctlr->imu_input, ABS_Y, JC_IMU_ACCEL_RES_PER_G);
-		input_abs_set_res(ctlr->imu_input, ABS_Z, JC_IMU_ACCEL_RES_PER_G);
-
-		input_set_abs_params(ctlr->imu_input, ABS_RX,
-				     -JC_IMU_MAX_GYRO_MAG, JC_IMU_MAX_GYRO_MAG,
-				     JC_IMU_GYRO_FUZZ, JC_IMU_GYRO_FLAT);
-		input_set_abs_params(ctlr->imu_input, ABS_RY,
-				     -JC_IMU_MAX_GYRO_MAG, JC_IMU_MAX_GYRO_MAG,
-				     JC_IMU_GYRO_FUZZ, JC_IMU_GYRO_FLAT);
-		input_set_abs_params(ctlr->imu_input, ABS_RZ,
-				     -JC_IMU_MAX_GYRO_MAG, JC_IMU_MAX_GYRO_MAG,
-				     JC_IMU_GYRO_FUZZ, JC_IMU_GYRO_FLAT);
-
-		input_abs_set_res(ctlr->imu_input, ABS_RX, JC_IMU_GYRO_RES_PER_DPS);
-		input_abs_set_res(ctlr->imu_input, ABS_RY, JC_IMU_GYRO_RES_PER_DPS);
-		input_abs_set_res(ctlr->imu_input, ABS_RZ, JC_IMU_GYRO_RES_PER_DPS);
-
-		__set_bit(EV_MSC, ctlr->imu_input->evbit);
-		__set_bit(MSC_TIMESTAMP, ctlr->imu_input->mscbit);
-		__set_bit(INPUT_PROP_ACCELEROMETER, ctlr->imu_input->propbit);
-
-		ret = input_register_device(ctlr->imu_input);
-		if (ret)
-			return ret;
-	}
 
 	return 0;
 }
@@ -2631,6 +2521,28 @@ static int joycon_read_mac(struct joycon_ctlr *ctlr)
 		ctlr->is_hori = false;
 	}
 
+#if IS_ENABLED(CONFIG_JOYCON_SERDEV_FF)
+	/* Set up rumble */
+	if (!ctlr->is_hori && !ctlr->is_sio) {
+		input_unregister_device(ctlr->input);
+		input_set_capability(ctlr->input, EV_FF, FF_RUMBLE);
+		input_ff_create_memless(ctlr->input, NULL, joycon_play_effect);
+		ctlr->rumble_ll_freq = JC_RUMBLE_DFLT_LOW_FREQ;
+		ctlr->rumble_lh_freq = JC_RUMBLE_DFLT_HIGH_FREQ;
+		ctlr->rumble_rl_freq = JC_RUMBLE_DFLT_LOW_FREQ;
+		ctlr->rumble_rh_freq = JC_RUMBLE_DFLT_HIGH_FREQ;
+		joycon_clamp_rumble_freqs(ctlr);
+		joycon_set_rumble(ctlr, 0, 0, false);
+		ctlr->rumble_msecs = jiffies_to_msecs(jiffies);
+		msleep(100);
+		ret = input_register_device(ctlr->input);
+		if (ret) {
+			dev_err(&ctlr->sdev->dev, "Failed to register joy-con ff device\n");
+			return ret;
+		}
+	}
+#endif
+
 	ctlr->mac_addr_str = devm_kasprintf(&ctlr->sdev->dev, GFP_KERNEL,
 					    "%02X:%02X:%02X:%02X:%02X:%02X",
 					    ctlr->mac_addr[0],
@@ -2820,7 +2732,10 @@ exit:
 static int sio_handshake(struct joycon_ctlr *ctlr)
 {
 	int ret;
+	int i;
 	struct device *dev = &ctlr->sdev->dev;
+	struct device_node *np = dev->of_node;
+	bool imu_enabled = true;
 	u8 mac[] = {0x98, 0xb6, 0xe9, 0x53, 0x49, 0x4f};
 	u8 version[] = {0x03, 0x04};
 
@@ -2854,6 +2769,11 @@ static int sio_handshake(struct joycon_ctlr *ctlr)
 	}
 
 	ctlr->ctlr_type = JOYCON_TYPE_SIO;
+	ctlr->input->id.product = 0xF123;
+	ctlr->input->name = "Nintendo Switch Lite Gamepad";
+
+	input_set_drvdata(ctlr->input, ctlr);
+
 	memcpy(ctlr->mac_addr, mac, sizeof(mac));
 	ctlr->mac_addr_str = devm_kasprintf(&ctlr->sdev->dev, GFP_KERNEL,
 					    "%02X:%02X:%02X:%02X:%02X:%02X",
@@ -2865,6 +2785,95 @@ static int sio_handshake(struct joycon_ctlr *ctlr)
 					    ctlr->mac_addr[5]);
 	if (!ctlr->mac_addr_str)
 		return -ENOMEM;
+
+	input_unregister_device(ctlr->input);
+
+	/* Left analog stick */
+	input_set_abs_params(ctlr->input, ABS_X,
+					-JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
+					JC_STICK_FUZZ, JC_STICK_FLAT);
+	input_set_abs_params(ctlr->input, ABS_Y,
+					-JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
+					JC_STICK_FUZZ, JC_STICK_FLAT);
+	/* Right analog stick */
+	input_set_abs_params(ctlr->input, ABS_RX,
+					-JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
+					JC_STICK_FUZZ, JC_STICK_FLAT);
+	input_set_abs_params(ctlr->input, ABS_RY,
+					-JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
+					JC_STICK_FUZZ, JC_STICK_FLAT);
+
+	/* Set up buttons */
+	for (i = 0; joycon_button_inputs_sio[i] > 0; i++)
+		input_set_capability(ctlr->input, EV_KEY,
+						joycon_button_inputs_sio[i]);
+
+	msleep(100);
+
+	ret = input_register_device(ctlr->input);
+	if (ret) {
+		dev_err(dev, "Failed to reregister sio during handshake\n");
+		return ret;
+	}
+
+	dev_info(dev, "config imu\n");
+
+	imu_enabled = !of_property_read_bool(np, "imu-disable");
+
+	if (imu_enabled) {
+		/* Configure the imu input device */
+		ctlr->imu_input = devm_input_allocate_device(dev);
+		if (!ctlr->imu_input)
+			return -ENOMEM;
+
+		/* Set calibration data */
+		sio_set_imu_calibration(ctlr);
+
+		ctlr->imu_input->dev.parent = dev;
+		ctlr->imu_input->id.bustype = BUS_VIRTUAL;
+		ctlr->imu_input->id.vendor = 0x57e;
+		ctlr->imu_input->id.product = 0xF123;
+		ctlr->imu_input->id.version = 0;
+		ctlr->imu_input->uniq = ctlr->mac_addr_str;
+		ctlr->imu_input->name = "Nintendo Switch Lite Gamepad IMU";
+		input_set_drvdata(ctlr->imu_input, ctlr);
+
+		/* Configure imu axes */
+		input_set_abs_params(ctlr->imu_input, ABS_X,
+				     -JC_IMU_MAX_ACCEL_MAG, JC_IMU_MAX_ACCEL_MAG,
+				     JC_IMU_ACCEL_FUZZ, JC_IMU_ACCEL_FLAT);
+		input_set_abs_params(ctlr->imu_input, ABS_Y,
+				     -JC_IMU_MAX_ACCEL_MAG, JC_IMU_MAX_ACCEL_MAG,
+				     JC_IMU_ACCEL_FUZZ, JC_IMU_ACCEL_FLAT);
+		input_set_abs_params(ctlr->imu_input, ABS_Z,
+				     -JC_IMU_MAX_ACCEL_MAG, JC_IMU_MAX_ACCEL_MAG,
+				     JC_IMU_ACCEL_FUZZ, JC_IMU_ACCEL_FLAT);
+		input_abs_set_res(ctlr->imu_input, ABS_X, JC_IMU_ACCEL_RES_PER_G);
+		input_abs_set_res(ctlr->imu_input, ABS_Y, JC_IMU_ACCEL_RES_PER_G);
+		input_abs_set_res(ctlr->imu_input, ABS_Z, JC_IMU_ACCEL_RES_PER_G);
+
+		input_set_abs_params(ctlr->imu_input, ABS_RX,
+				     -JC_IMU_MAX_GYRO_MAG, JC_IMU_MAX_GYRO_MAG,
+				     JC_IMU_GYRO_FUZZ, JC_IMU_GYRO_FLAT);
+		input_set_abs_params(ctlr->imu_input, ABS_RY,
+				     -JC_IMU_MAX_GYRO_MAG, JC_IMU_MAX_GYRO_MAG,
+				     JC_IMU_GYRO_FUZZ, JC_IMU_GYRO_FLAT);
+		input_set_abs_params(ctlr->imu_input, ABS_RZ,
+				     -JC_IMU_MAX_GYRO_MAG, JC_IMU_MAX_GYRO_MAG,
+				     JC_IMU_GYRO_FUZZ, JC_IMU_GYRO_FLAT);
+
+		input_abs_set_res(ctlr->imu_input, ABS_RX, JC_IMU_GYRO_RES_PER_DPS);
+		input_abs_set_res(ctlr->imu_input, ABS_RY, JC_IMU_GYRO_RES_PER_DPS);
+		input_abs_set_res(ctlr->imu_input, ABS_RZ, JC_IMU_GYRO_RES_PER_DPS);
+
+		__set_bit(EV_MSC, ctlr->imu_input->evbit);
+		__set_bit(MSC_TIMESTAMP, ctlr->imu_input->mscbit);
+		__set_bit(INPUT_PROP_ACCELEROMETER, ctlr->imu_input->propbit);
+
+		ret = input_register_device(ctlr->imu_input);
+		if (ret)
+			return ret;
+	}
 
 	if (!ctlr->stick_cal_x.center) {
 		ctlr->stick_cal_x.center = DFLT_STICK_CAL_CEN;
@@ -2946,12 +2955,6 @@ static int joycon_post_handshake(struct joycon_ctlr *ctlr)
 		    - battery
 		   and doesn't seem to require calibration.
 		*/
-	}
-
-	ret = joycon_input_create(ctlr);
-	if (ret) {
-		dev_err(dev, "Failed to create input device; ret=%d\n", ret);
-		goto error;
 	}
 
 	ctlr->last_input_report_msecs = jiffies_to_msecs(jiffies);
@@ -3415,6 +3418,13 @@ static int joycon_serdev_probe(struct serdev_device *serdev)
 	mutex_init(&ctlr->output_mutex);
 	init_waitqueue_head(&ctlr->wait);
 	spin_lock_init(&ctlr->lock);
+
+	ret = joycon_input_create(ctlr);
+	if (ret) {
+		dev_err(dev, "Failed to create input device; ret=%d\n", ret);
+		goto err;
+	}
+
 	ctlr->rumble_queue = alloc_ordered_workqueue("joycon-serdev-rumble_wq",
 					     WQ_FREEZABLE | WQ_MEM_RECLAIM);
 	if (!ctlr->rumble_queue) {
@@ -3591,8 +3601,21 @@ static void joycon_serdev_remove(struct serdev_device *serdev)
 	}
 
 	serdev_device_close(serdev);
-	if (ctlr->ctlr_state == JOYCON_CTLR_STATE_READ)
+	if (ctlr->ctlr_state == JOYCON_CTLR_STATE_READ) {
 		joycon_disconnect(ctlr);
+
+		dev_info(&serdev->dev, "Removing input device\n");
+		/* Remove input imu device */
+		if (ctlr->imu_input) {
+			input_unregister_device(ctlr->imu_input);
+			ctlr->imu_input = NULL;
+		}
+		/* Remove input device */
+		if (ctlr->input) {
+			input_unregister_device(ctlr->input);
+			ctlr->input = NULL;
+		}
+	}
 
 	joycon_stop_queues(ctlr);
 	joycon_free_queues(ctlr);
