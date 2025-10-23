@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c5aa7dd4_46ca027c",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 36115
+      },
+      "writtenOn": "2025-10-23T11:21:22Z",
+      "side": 1,
+      "message": "I\u0027ve tested and verified this on my own v1 Switch",
+      "revId": "4d926f3d570ed4c43d115f0bf4761c9fa18dd304",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
