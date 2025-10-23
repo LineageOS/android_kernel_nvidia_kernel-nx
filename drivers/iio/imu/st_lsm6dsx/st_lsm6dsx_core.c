@@ -990,11 +990,35 @@ static int __maybe_unused st_lsm6dsx_suspend(struct device *dev)
 	return err;
 }
 
+static void st_lsm6dsx_dummy_read(struct st_lsm6dsx_hw *hw)
+{
+	struct st_lsm6dsx_sensor *sensor;
+	const struct st_lsm6dsx_reg *reg;
+	int err;
+	u32 val_raw;
+
+	sensor = iio_priv(hw->iio_devs[ST_LSM6DSX_ID_ACC]);
+
+	reg = &st_lsm6dsx_fs_table[sensor->id].reg;
+
+	err = regmap_read(hw->regmap, reg->addr, &val_raw);
+	if (err < 0)
+		dev_err(hw->dev, "Failed dummy read");
+}
+
 static int __maybe_unused st_lsm6dsx_resume(struct device *dev)
 {
 	struct st_lsm6dsx_hw *hw = dev_get_drvdata(dev);
 	struct st_lsm6dsx_sensor *sensor;
 	int i, err = 0;
+
+	/*
+	 * HACK: Perform a dummy read to workaround an issue on NX, that the first
+	 * read after resume returns the wrong value, causing `st_lsm6dsx_set_odr`
+	 * to clobber the other bits of the register `CTRL1_XL`, changing the
+	 * accelerometer scale and break screen rotation.
+	 */
+	st_lsm6dsx_dummy_read(hw);
 
 	for (i = 0; i < ST_LSM6DSX_ID_MAX; i++) {
 		sensor = iio_priv(hw->iio_devs[i]);
