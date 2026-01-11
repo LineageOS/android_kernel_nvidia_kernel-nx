@@ -3548,18 +3548,23 @@ err:
 static void joycon_stop_queues(struct joycon_ctlr *ctlr)
 {
 	dev_info(&ctlr->sdev->dev, "Stopping queues\n");
-	if (ctlr->input_queue) {
-		cancel_delayed_work_sync(&ctlr->input_worker);
-		flush_workqueue(ctlr->input_queue);
-	}
-	if (ctlr->rumble_queue) {
-		cancel_delayed_work_sync(&ctlr->rumble_worker);
-		flush_workqueue(ctlr->rumble_queue);
-	}
-	if (ctlr->detection_queue) {
-		cancel_delayed_work_sync(&ctlr->detection_worker);
-		flush_workqueue(ctlr->detection_queue);
-	}
+	if (ctlr->input_queue)
+		cancel_delayed_work(&ctlr->input_worker);
+	if (ctlr->rumble_queue)
+		cancel_delayed_work(&ctlr->rumble_worker);
+	if (ctlr->detection_queue)
+		cancel_delayed_work(&ctlr->detection_worker);
+}
+
+static void joycon_drain_queues(struct joycon_ctlr *ctlr)
+{
+	dev_info(&ctlr->sdev->dev, "Draining queues\n");
+	if (ctlr->input_queue)
+		drain_workqueue(ctlr->input_queue);
+	if (ctlr->rumble_queue)
+		drain_workqueue(ctlr->rumble_queue);
+	if (ctlr->detection_queue)
+		drain_workqueue(ctlr->detection_queue);
 }
 
 static void joycon_free_queues(struct joycon_ctlr *ctlr)
@@ -3590,6 +3595,7 @@ static void joycon_serdev_remove(struct serdev_device *serdev)
 		joycon_disconnect(ctlr);
 
 	joycon_stop_queues(ctlr);
+	joycon_drain_queues(ctlr);
 	joycon_free_queues(ctlr);
 	ctlr->ctlr_removed = true;
 	if (ctlr->battery)
@@ -3609,13 +3615,7 @@ static int __maybe_unused joycon_serdev_suspend(struct device *dev)
 	struct joycon_ctlr *ctlr = dev_get_drvdata(dev);
 	unsigned long flags;
 
-	dev_info(dev, "Suspend\n");
-
-	if (ctlr->detect_en_req) {
-		disable_irq(ctlr->detect_irq);
-		gpio_free(ctlr->detect_en_gpio);
-		ctlr->detect_en_req = false;
-	}
+	dev_info(dev, "Suspend, freezing device\n");
 
 	spin_lock_irqsave(&ctlr->lock, flags);
 	if (ctlr->suspending) {
@@ -3625,7 +3625,15 @@ static int __maybe_unused joycon_serdev_suspend(struct device *dev)
 	ctlr->suspending = true;
 	spin_unlock_irqrestore(&ctlr->lock, flags);
 
+	joycon_stop_queues(ctlr);
+
 	mutex_lock(&ctlr->init_mutex);
+
+	if (ctlr->detect_en_req) {
+		disable_irq(ctlr->detect_irq);
+		gpio_free(ctlr->detect_en_gpio);
+		ctlr->detect_en_req = false;
+	}
 
 	/* Stop charging */
 	if (!IS_ERR_OR_NULL(ctlr->charger_reg) &&
@@ -3633,20 +3641,64 @@ static int __maybe_unused joycon_serdev_suspend(struct device *dev)
 		regulator_disable(ctlr->charger_reg);
 
 	if (ctlr->ctlr_state == JOYCON_CTLR_STATE_READ) {
-		/* Attempt telling the joy-con to sleep to decrease battery drain */
-		if (!ctlr->is_sio)
-			joycon_set_hci_state(ctlr, 0);
-		joycon_disconnect(ctlr);
-
 		if (ctlr->is_sio)
 			gpio_direction_output(ctlr->sio_rst_gpio, 0);
-	}
+		else
+			joycon_set_hci_state(ctlr, 0);
 
-	joycon_stop_queues(ctlr);
+		spin_lock_irqsave(&ctlr->lock, flags);
+		ctlr->ctlr_state = JOYCON_CTLR_STATE_INIT;
+		spin_unlock_irqrestore(&ctlr->lock, flags);
+	}
 
 	mutex_unlock(&ctlr->init_mutex);
 
+	joycon_drain_queues(ctlr);
+
 	return 0;
+}
+
+static int joycon_serdev_thaw(struct device *dev, struct joycon_ctlr *ctlr) {
+	unsigned long flags;
+	int ret = 0;
+
+	mutex_lock(&ctlr->init_mutex);
+
+	/* sio gets reset and must handshake, joycons are sleeping and must wake */
+	if (ctlr->is_sio)
+		ret = sio_handshake(ctlr);
+	else
+		joycon_set_hci_state(ctlr, 1);
+
+	if (!ret) {
+		if (!ctlr->is_hori && !ctlr->is_sio) {
+			mutex_lock(&ctlr->output_mutex);
+			joycon_enable_rumble(ctlr, true);
+			mutex_unlock(&ctlr->output_mutex);
+		}
+
+		spin_lock_irqsave(&ctlr->lock, flags);
+		ctlr->last_input_report_msecs = jiffies_to_msecs(jiffies);
+		ctlr->ctlr_state = JOYCON_CTLR_STATE_READ;
+		ctlr->ctlr_removed = false;
+		spin_unlock_irqrestore(&ctlr->lock, flags);
+
+		/* Start charging */
+		if (!IS_ERR_OR_NULL(ctlr->charger_reg) &&
+			!regulator_is_enabled(ctlr->charger_reg) &&
+			regulator_enable(ctlr->charger_reg))
+			dev_err(dev, "Failed to enable charger\n");
+
+		queue_delayed_work(ctlr->input_queue, &ctlr->input_worker, 0);
+
+		mutex_unlock(&ctlr->init_mutex);
+		dev_info(dev, "Input device thawed\n");
+		return 0;
+	}
+
+	mutex_unlock(&ctlr->init_mutex);
+	dev_warn(dev, "Failed to thaw input device, entering detection\n");
+	return -EINVAL;
 }
 
 static int __maybe_unused joycon_serdev_resume(struct device *dev)
@@ -3661,6 +3713,14 @@ static int __maybe_unused joycon_serdev_resume(struct device *dev)
 
 	if (ctlr->is_sio)
 		gpio_direction_input(ctlr->sio_rst_gpio);
+
+	if (ctlr->input) {
+		dev_info(dev, "Input device active, attempting thaw\n");
+		if (!joycon_serdev_thaw(dev, ctlr))
+			return 0;
+		else
+			joycon_disconnect(ctlr);
+	}
 
 	return joycon_enter_detection(ctlr);
 }
