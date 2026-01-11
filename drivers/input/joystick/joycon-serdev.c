@@ -585,7 +585,7 @@ struct joycon_ctlr {
 };
 
 static int joycon_serdev_send(struct joycon_ctlr *ctlr, u8 *data,
-			      size_t len, u32 timeout)
+				  size_t len, u32 timeout)
 {
 	int ret;
 
@@ -665,9 +665,9 @@ err:
 }
 
 static int joycon_send_packet(struct joycon_ctlr *ctlr, u8 command,
-			      u8 *hdata, size_t hdata_size,
-			      u8 *data, size_t data_size, u32 timeout,
-			      bool sync)
+				  u8 *hdata, size_t hdata_size,
+				  u8 *data, size_t data_size, u32 timeout,
+				  bool sync)
 {
 	struct joycon_uart_packet *packet;
 	struct device *dev = &ctlr->sdev->dev;
@@ -703,8 +703,8 @@ static int joycon_send_packet(struct joycon_ctlr *ctlr, u8 command,
 
 	if (sync)
 		ret = joycon_serdev_send_sync(ctlr, (u8 *)packet,
-					      sizeof(*packet) + data_size,
-					      timeout);
+						  sizeof(*packet) + data_size,
+						  timeout);
 	else
 		ret = joycon_serdev_send(ctlr, (u8 *)packet,
 					 sizeof(*packet) + data_size, timeout);
@@ -719,9 +719,9 @@ err:
 
 
 static int sio_send_packet(struct joycon_ctlr *ctlr, u8 command,
-			      u8 *hdata, size_t hdata_size,
-			      u8 *data, size_t data_size, u32 timeout,
-			      bool sync)
+				  u8 *hdata, size_t hdata_size,
+				  u8 *data, size_t data_size, u32 timeout,
+				  bool sync)
 {
 	struct sio_uart_packet *packet;
 	struct device *dev = &ctlr->sdev->dev;
@@ -753,8 +753,8 @@ static int sio_send_packet(struct joycon_ctlr *ctlr, u8 command,
 
 	if (sync)
 		ret = joycon_serdev_send_sync(ctlr, (u8 *)packet,
-					      sizeof(*packet) + data_size,
-					      timeout);
+						  sizeof(*packet) + data_size,
+						  timeout);
 	else
 		ret = joycon_serdev_send(ctlr, (u8 *)packet,
 					 sizeof(*packet) + data_size, timeout);
@@ -769,7 +769,7 @@ err:
 
 /* Caller must set ctlr->uart_cmd_match prior to calling */
 static int joycon_send_command(struct joycon_ctlr *ctlr, u8 command,
-			       u8 *data, size_t data_len, u32 timeout)
+				   u8 *data, size_t data_len, u32 timeout)
 {
 	struct device *dev = &ctlr->sdev->dev;
 	int ret;
@@ -783,8 +783,8 @@ static int joycon_send_command(struct joycon_ctlr *ctlr, u8 command,
 }
 
 static int joycon_send_subcmd(struct joycon_ctlr *ctlr,
-			      struct joycon_subcmd_request *subcmd,
-			      size_t data_len, u32 timeout)
+				  struct joycon_subcmd_request *subcmd,
+				  size_t data_len, u32 timeout)
 {
 	int ret;
 	unsigned long flags;
@@ -793,7 +793,7 @@ static int joycon_send_subcmd(struct joycon_ctlr *ctlr,
 
 	spin_lock_irqsave(&ctlr->lock, flags);
 	memcpy(subcmd->rumble_data, ctlr->rumble_data[ctlr->rumble_queue_tail],
-	       JC_RUMBLE_DATA_SIZE);
+		   JC_RUMBLE_DATA_SIZE);
 	spin_unlock_irqrestore(&ctlr->lock, flags);
 
 	subcmd->output_id = JC_OUTPUT_RUMBLE_AND_SUBCMD;
@@ -941,7 +941,7 @@ static int joycon_check_for_cal_magic(struct joycon_ctlr *ctlr, u32 flash_addr)
 	u8 *reply;
 
 	ret = joycon_request_spi_flash_read(ctlr, flash_addr,
-					    JC_CAL_USR_MAGIC_SIZE, &reply);
+						JC_CAL_USR_MAGIC_SIZE, &reply);
 	if (ret)
 		return ret;
 
@@ -961,7 +961,7 @@ static int joycon_read_stick_calibration(struct joycon_ctlr *ctlr, u16 cal_addr,
 	int ret;
 
 	ret = joycon_request_spi_flash_read(ctlr, cal_addr,
-					    JC_CAL_STICK_DATA_SIZE, &raw_cal);
+						JC_CAL_STICK_DATA_SIZE, &raw_cal);
 	if (ret)
 		return ret;
 
@@ -1010,12 +1010,12 @@ static int joycon_request_calibration(struct joycon_ctlr *ctlr)
 
 	/* Check if user stick calibrations are present */
 	if (type == JOYCON_TYPE_LEFT &&
-	    !joycon_check_for_cal_magic(ctlr, JC_CAL_USR_LEFT_MAGIC_ADDR)) {
+		!joycon_check_for_cal_magic(ctlr, JC_CAL_USR_LEFT_MAGIC_ADDR)) {
 		stick_addr = JC_CAL_USR_LEFT_DATA_ADDR;
 		dev_info(dev, "Using user cal for left stick\n");
 	} else if (type == JOYCON_TYPE_RIGHT &&
 		   !joycon_check_for_cal_magic(ctlr,
-					       JC_CAL_USR_RIGHT_MAGIC_ADDR)) {
+						   JC_CAL_USR_RIGHT_MAGIC_ADDR)) {
 		stick_addr = JC_CAL_USR_RIGHT_DATA_ADDR;
 		dev_info(dev, "Using user cal for right stick\n");
 	} else {
@@ -1024,9 +1024,9 @@ static int joycon_request_calibration(struct joycon_ctlr *ctlr)
 
 	/* Read the stick calibration data */
 	ret = joycon_read_stick_calibration(ctlr, stick_addr,
-					    &ctlr->stick_cal_x,
-					    &ctlr->stick_cal_y,
-					    type == JOYCON_TYPE_LEFT);
+						&ctlr->stick_cal_x,
+						&ctlr->stick_cal_y,
+						type == JOYCON_TYPE_LEFT);
 	if (ret) {
 		dev_warn(dev,
 			 "Failed to read stick cal, using defaults; e=%d\n",
@@ -1176,13 +1176,13 @@ static void joycon_parse_report(struct joycon_ctlr *ctlr,
 	if (ctlr->battery_capacity == POWER_SUPPLY_CAPACITY_LEVEL_FULL) {
 		/* Stop charging */
 		if (!IS_ERR_OR_NULL(ctlr->charger_reg) &&
-		    regulator_is_enabled(ctlr->charger_reg) > 0)
+			regulator_is_enabled(ctlr->charger_reg) > 0)
 			regulator_disable(ctlr->charger_reg);
 	} else if (ctlr->battery_capacity != POWER_SUPPLY_CAPACITY_LEVEL_HIGH) {
 		/* Start charging */
 		if (!IS_ERR_OR_NULL(ctlr->charger_reg) &&
-		    !regulator_is_enabled(ctlr->charger_reg) &&
-		    regulator_enable(ctlr->charger_reg))
+			!regulator_is_enabled(ctlr->charger_reg) &&
+			regulator_enable(ctlr->charger_reg))
 			dev_err(&ctlr->sdev->dev, "Failed to enable charger\n");
 	}
 
@@ -1263,9 +1263,9 @@ static void joycon_parse_report(struct joycon_ctlr *ctlr,
 }
 
 static void sio_input_report_parse_imu_data(struct joycon_ctlr *ctlr,
-					       struct sio_input_report *rep,
-					       struct joycon_imu_data *imu_data,
-					       int report_num)
+						   struct sio_input_report *rep,
+						   struct joycon_imu_data *imu_data,
+						   int report_num)
 {
 	u8 *raw = rep->imu_raw_bytes;
 	int i;
@@ -1285,7 +1285,7 @@ static void sio_input_report_parse_imu_data(struct joycon_ctlr *ctlr,
 }
 
 static void sio_parse_imu_report(struct joycon_ctlr *ctlr,
-				    struct sio_input_report *rep)
+					struct sio_input_report *rep)
 {
 	struct device *dev = &ctlr->sdev->dev;
 	struct joycon_imu_data imu_data[15] = {{0}}; /* 15 reports per packet */
@@ -1326,7 +1326,7 @@ static void sio_parse_imu_report(struct joycon_ctlr *ctlr,
 		ctlr->imu_delta_samples_sum += delta;
 		ctlr->imu_delta_samples_count++;
 		if (ctlr->imu_delta_samples_count >=
-		    JC_IMU_SAMPLES_PER_DELTA_AVG) {
+			JC_IMU_SAMPLES_PER_DELTA_AVG) {
 			ctlr->imu_avg_delta_ms = ctlr->imu_delta_samples_sum /
 						 ctlr->imu_delta_samples_count;
 			/* Don't ever want divide by zero shenanigans */
@@ -1363,7 +1363,7 @@ static void sio_parse_imu_report(struct joycon_ctlr *ctlr,
 	/* Each IMU input report contains 15 samples max */
 	for (i = 0; i < report_num; i++) {
 		input_event(idev, EV_MSC, MSC_TIMESTAMP,
-			    ctlr->imu_timestamp_us);
+				ctlr->imu_timestamp_us);
 
 		/*
 		 * These calculations (which use the controller's calibration
@@ -1384,30 +1384,30 @@ static void sio_parse_imu_report(struct joycon_ctlr *ctlr,
 		 * bit integer math), the mult_frac macro is used.
 		 */
 		value[0] = mult_frac((JC_IMU_PREC_RANGE_SCALE *
-				      (imu_data[i].gyro_x -
-				       ctlr->gyro_cal.offset[0])),
-				     ctlr->gyro_cal.scale[0],
-				     ctlr->imu_cal_gyro_divisor[0]);
+					  (imu_data[i].gyro_x -
+					   ctlr->gyro_cal.offset[0])),
+					 ctlr->gyro_cal.scale[0],
+					 ctlr->imu_cal_gyro_divisor[0]);
 		value[1] = mult_frac((JC_IMU_PREC_RANGE_SCALE *
-				      (imu_data[i].gyro_y -
-				       ctlr->gyro_cal.offset[1])),
-				     ctlr->gyro_cal.scale[1],
-				     ctlr->imu_cal_gyro_divisor[1]);
+					  (imu_data[i].gyro_y -
+					   ctlr->gyro_cal.offset[1])),
+					 ctlr->gyro_cal.scale[1],
+					 ctlr->imu_cal_gyro_divisor[1]);
 		value[2] = mult_frac((JC_IMU_PREC_RANGE_SCALE *
-				      (imu_data[i].gyro_z -
-				       ctlr->gyro_cal.offset[2])),
-				     ctlr->gyro_cal.scale[2],
-				     ctlr->imu_cal_gyro_divisor[2]);
+					  (imu_data[i].gyro_z -
+					   ctlr->gyro_cal.offset[2])),
+					 ctlr->gyro_cal.scale[2],
+					 ctlr->imu_cal_gyro_divisor[2]);
 
 		value[3] = ((s32)imu_data[i].accel_x *
-			    ctlr->accel_cal.scale[0]) /
-			    ctlr->imu_cal_accel_divisor[0];
+				ctlr->accel_cal.scale[0]) /
+				ctlr->imu_cal_accel_divisor[0];
 		value[4] = ((s32)imu_data[i].accel_y *
-			    ctlr->accel_cal.scale[1]) /
-			    ctlr->imu_cal_accel_divisor[1];
+				ctlr->accel_cal.scale[1]) /
+				ctlr->imu_cal_accel_divisor[1];
 		value[5] = ((s32)imu_data[i].accel_z *
-			    ctlr->accel_cal.scale[2]) /
-			    ctlr->imu_cal_accel_divisor[2];
+				ctlr->accel_cal.scale[2]) /
+				ctlr->imu_cal_accel_divisor[2];
 
 		dev_dbg(dev, "raw_gyro: g_x=%hd g_y=%hd g_z=%hd\n",
 			imu_data[i].gyro_x, imu_data[i].gyro_y,
@@ -1443,7 +1443,7 @@ static void sio_parse_imu_report(struct joycon_ctlr *ctlr,
 }
 
 static void sio_parse_report(struct joycon_ctlr *ctlr,
-			     struct sio_input_report *rep)
+				 struct sio_input_report *rep)
 {
 	struct input_dev *dev = ctlr->input;
 	unsigned long flags;
@@ -1556,7 +1556,7 @@ static int sio_request_input_report(struct joycon_ctlr *ctlr)
 	ctlr->msg_type = JOYCON_MSG_TYPE_SUBCMD;
 	ctlr->uart_cmd_match = JC_SIO_CMD_INPUTREPORT | JC_SIO_CMD_ACK;
 	ret = sio_send_packet(ctlr, JC_SIO_CMD_INPUTREPORT, NULL, 0, NULL, 0,
-			      HZ/4, false);
+				  HZ/4, false);
 	if (ret)
 		dev_err(dev, "Failed to request input report; ret=%d\n", ret);
 	return ret;
@@ -1723,13 +1723,13 @@ static int joycon_enter_detection(struct joycon_ctlr *ctlr)
 
 	/* Start charging */
 	if (!IS_ERR_OR_NULL(ctlr->charger_reg) &&
-	    !regulator_is_enabled(ctlr->charger_reg) &&
-	    regulator_enable(ctlr->charger_reg))
+		!regulator_is_enabled(ctlr->charger_reg) &&
+		regulator_enable(ctlr->charger_reg))
 		dev_err(dev, "Failed to enable charger\n");
 
 	/* Enter interrupt based detection */
 	if (gpio_is_valid(ctlr->detect_gpio) &&
-	    gpio_is_valid(ctlr->detect_en_gpio)) {
+		gpio_is_valid(ctlr->detect_en_gpio)) {
 		ret = gpio_request(ctlr->detect_en_gpio, "jc-detect-en");
 		if (ret < 0) {
 			dev_err(dev, "Failed to enable detect pin; ret=%d\n",
@@ -1840,7 +1840,7 @@ static int joycon_send_rumble_data(struct joycon_ctlr *ctlr)
 	*/
 
 	memcpy(subcmd->rumble_data, ctlr->rumble_data[ctlr->rumble_queue_tail],
-	       JC_RUMBLE_DATA_SIZE);
+		   JC_RUMBLE_DATA_SIZE);
 	/* Set keep alive flag */
 	memcpy(&rumble, subcmd->rumble_data, sizeof(rumble));
 	if (ctlr->ctlr_type == JOYCON_TYPE_LEFT) {
@@ -1987,22 +1987,22 @@ static void joycon_clamp_rumble_freqs(struct joycon_ctlr *ctlr)
 
 	spin_lock_irqsave(&ctlr->lock, flags);
 	ctlr->rumble_ll_freq = clamp(ctlr->rumble_ll_freq,
-				     JOYCON_MIN_RUMBLE_LOW_FREQ,
-				     JOYCON_MAX_RUMBLE_LOW_FREQ);
+					 JOYCON_MIN_RUMBLE_LOW_FREQ,
+					 JOYCON_MAX_RUMBLE_LOW_FREQ);
 	ctlr->rumble_lh_freq = clamp(ctlr->rumble_lh_freq,
-				     JOYCON_MIN_RUMBLE_HIGH_FREQ,
-				     JOYCON_MAX_RUMBLE_HIGH_FREQ);
+					 JOYCON_MIN_RUMBLE_HIGH_FREQ,
+					 JOYCON_MAX_RUMBLE_HIGH_FREQ);
 	ctlr->rumble_rl_freq = clamp(ctlr->rumble_rl_freq,
-				     JOYCON_MIN_RUMBLE_LOW_FREQ,
-				     JOYCON_MAX_RUMBLE_LOW_FREQ);
+					 JOYCON_MIN_RUMBLE_LOW_FREQ,
+					 JOYCON_MAX_RUMBLE_LOW_FREQ);
 	ctlr->rumble_rh_freq = clamp(ctlr->rumble_rh_freq,
-				     JOYCON_MIN_RUMBLE_HIGH_FREQ,
-				     JOYCON_MAX_RUMBLE_HIGH_FREQ);
+					 JOYCON_MIN_RUMBLE_HIGH_FREQ,
+					 JOYCON_MAX_RUMBLE_HIGH_FREQ);
 	spin_unlock_irqrestore(&ctlr->lock, flags);
 }
 
 static int joycon_set_rumble(struct joycon_ctlr *ctlr, u16 amp_weak, u16 amp_strong,
-			     bool schedule_now)
+				 bool schedule_now)
 {
 	u8 data[JC_RUMBLE_DATA_SIZE];
 	u16 amp;
@@ -2032,7 +2032,7 @@ static int joycon_set_rumble(struct joycon_ctlr *ctlr, u16 amp_weak, u16 amp_str
 	if (++ctlr->rumble_queue_head >= JC_RUMBLE_QUEUE_SIZE)
 		ctlr->rumble_queue_head = 0;
 	memcpy(ctlr->rumble_data[ctlr->rumble_queue_head], data,
-	       JC_RUMBLE_DATA_SIZE);
+		   JC_RUMBLE_DATA_SIZE);
 	removed = ctlr->ctlr_state == JOYCON_CTLR_STATE_INIT || ctlr->ctlr_removed;
 	spin_unlock_irqrestore(&ctlr->lock, flags);
 
@@ -2044,7 +2044,7 @@ static int joycon_set_rumble(struct joycon_ctlr *ctlr, u16 amp_weak, u16 amp_str
 }
 
 static int joycon_play_effect(struct input_dev *dev, void *data,
-						     struct ff_effect *effect)
+							 struct ff_effect *effect)
 {
 	struct joycon_ctlr *ctlr = input_get_drvdata(dev);
 
@@ -2153,49 +2153,49 @@ static int joycon_input_create(struct joycon_ctlr *ctlr)
 	if (type == JOYCON_TYPE_LEFT) {
 		/* Analog stick */
 		input_set_abs_params(ctlr->input, ABS_X,
-				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
-				     JC_STICK_FUZZ, JC_STICK_FLAT);
+					 -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
+					 JC_STICK_FUZZ, JC_STICK_FLAT);
 		input_set_abs_params(ctlr->input, ABS_Y,
-				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
-				     JC_STICK_FUZZ, JC_STICK_FLAT);
+					 -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
+					 JC_STICK_FUZZ, JC_STICK_FLAT);
 
 		/* Set up buttons */
 		for (i = 0; joycon_button_inputs_left[i] > 0; i++)
 			input_set_capability(ctlr->input, EV_KEY,
-					     joycon_button_inputs_left[i]);
+						 joycon_button_inputs_left[i]);
 	} else if (type == JOYCON_TYPE_RIGHT) {
 		/* Analog stick */
 		input_set_abs_params(ctlr->input, ABS_RX,
-				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
-				     JC_STICK_FUZZ, JC_STICK_FLAT);
+					 -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
+					 JC_STICK_FUZZ, JC_STICK_FLAT);
 		input_set_abs_params(ctlr->input, ABS_RY,
-				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
-				     JC_STICK_FUZZ, JC_STICK_FLAT);
+					 -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
+					 JC_STICK_FUZZ, JC_STICK_FLAT);
 
 		/* Set up buttons */
 		for (i = 0; joycon_button_inputs_right[i] > 0; i++)
 			input_set_capability(ctlr->input, EV_KEY,
-					     joycon_button_inputs_right[i]);
+						 joycon_button_inputs_right[i]);
 	} else if (type == JOYCON_TYPE_SIO) {
 		/* Left analog stick */
 		input_set_abs_params(ctlr->input, ABS_X,
-				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
-				     JC_STICK_FUZZ, JC_STICK_FLAT);
+					 -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
+					 JC_STICK_FUZZ, JC_STICK_FLAT);
 		input_set_abs_params(ctlr->input, ABS_Y,
-				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
-				     JC_STICK_FUZZ, JC_STICK_FLAT);
+					 -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
+					 JC_STICK_FUZZ, JC_STICK_FLAT);
 		/* Right analog stick */
 		input_set_abs_params(ctlr->input, ABS_RX,
-				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
-				     JC_STICK_FUZZ, JC_STICK_FLAT);
+					 -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
+					 JC_STICK_FUZZ, JC_STICK_FLAT);
 		input_set_abs_params(ctlr->input, ABS_RY,
-				     -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
-				     JC_STICK_FUZZ, JC_STICK_FLAT);
+					 -JC_MAX_STICK_MAG, JC_MAX_STICK_MAG,
+					 JC_STICK_FUZZ, JC_STICK_FLAT);
 
 		/* Set up buttons */
 		for (i = 0; joycon_button_inputs_sio[i] > 0; i++)
 			input_set_capability(ctlr->input, EV_KEY,
-					     joycon_button_inputs_sio[i]);
+						 joycon_button_inputs_sio[i]);
 	}
 
 #if IS_ENABLED(CONFIG_JOYCON_SERDEV_FF)
@@ -2237,27 +2237,27 @@ static int joycon_input_create(struct joycon_ctlr *ctlr)
 
 		/* Configure imu axes */
 		input_set_abs_params(ctlr->imu_input, ABS_X,
-				     -JC_IMU_MAX_ACCEL_MAG, JC_IMU_MAX_ACCEL_MAG,
-				     JC_IMU_ACCEL_FUZZ, JC_IMU_ACCEL_FLAT);
+					 -JC_IMU_MAX_ACCEL_MAG, JC_IMU_MAX_ACCEL_MAG,
+					 JC_IMU_ACCEL_FUZZ, JC_IMU_ACCEL_FLAT);
 		input_set_abs_params(ctlr->imu_input, ABS_Y,
-				     -JC_IMU_MAX_ACCEL_MAG, JC_IMU_MAX_ACCEL_MAG,
-				     JC_IMU_ACCEL_FUZZ, JC_IMU_ACCEL_FLAT);
+					 -JC_IMU_MAX_ACCEL_MAG, JC_IMU_MAX_ACCEL_MAG,
+					 JC_IMU_ACCEL_FUZZ, JC_IMU_ACCEL_FLAT);
 		input_set_abs_params(ctlr->imu_input, ABS_Z,
-				     -JC_IMU_MAX_ACCEL_MAG, JC_IMU_MAX_ACCEL_MAG,
-				     JC_IMU_ACCEL_FUZZ, JC_IMU_ACCEL_FLAT);
+					 -JC_IMU_MAX_ACCEL_MAG, JC_IMU_MAX_ACCEL_MAG,
+					 JC_IMU_ACCEL_FUZZ, JC_IMU_ACCEL_FLAT);
 		input_abs_set_res(ctlr->imu_input, ABS_X, JC_IMU_ACCEL_RES_PER_G);
 		input_abs_set_res(ctlr->imu_input, ABS_Y, JC_IMU_ACCEL_RES_PER_G);
 		input_abs_set_res(ctlr->imu_input, ABS_Z, JC_IMU_ACCEL_RES_PER_G);
 
 		input_set_abs_params(ctlr->imu_input, ABS_RX,
-				     -JC_IMU_MAX_GYRO_MAG, JC_IMU_MAX_GYRO_MAG,
-				     JC_IMU_GYRO_FUZZ, JC_IMU_GYRO_FLAT);
+					 -JC_IMU_MAX_GYRO_MAG, JC_IMU_MAX_GYRO_MAG,
+					 JC_IMU_GYRO_FUZZ, JC_IMU_GYRO_FLAT);
 		input_set_abs_params(ctlr->imu_input, ABS_RY,
-				     -JC_IMU_MAX_GYRO_MAG, JC_IMU_MAX_GYRO_MAG,
-				     JC_IMU_GYRO_FUZZ, JC_IMU_GYRO_FLAT);
+					 -JC_IMU_MAX_GYRO_MAG, JC_IMU_MAX_GYRO_MAG,
+					 JC_IMU_GYRO_FUZZ, JC_IMU_GYRO_FLAT);
 		input_set_abs_params(ctlr->imu_input, ABS_RZ,
-				     -JC_IMU_MAX_GYRO_MAG, JC_IMU_MAX_GYRO_MAG,
-				     JC_IMU_GYRO_FUZZ, JC_IMU_GYRO_FLAT);
+					 -JC_IMU_MAX_GYRO_MAG, JC_IMU_MAX_GYRO_MAG,
+					 JC_IMU_GYRO_FUZZ, JC_IMU_GYRO_FLAT);
 
 		input_abs_set_res(ctlr->imu_input, ABS_RX, JC_IMU_GYRO_RES_PER_DPS);
 		input_abs_set_res(ctlr->imu_input, ABS_RY, JC_IMU_GYRO_RES_PER_DPS);
@@ -2276,7 +2276,7 @@ static int joycon_input_create(struct joycon_ctlr *ctlr)
 }
 
 static void joycon_led_brightness_set_noblock(struct led_classdev *led,
-					      enum led_brightness brightness)
+						  enum led_brightness brightness)
 {
 	struct device *dev = led->dev->parent;
 	struct serdev_device *sdev = to_serdev_device(dev);
@@ -2306,7 +2306,7 @@ static void joycon_led_brightness_set_noblock(struct led_classdev *led,
 }
 
 static int joycon_player_led_brightness_set(struct led_classdev *led,
-					    enum led_brightness brightness)
+						enum led_brightness brightness)
 {
 	struct device *dev = led->dev->parent;
 	struct serdev_device *sdev = to_serdev_device(dev);
@@ -2404,7 +2404,7 @@ static void joycon_led_worker(struct work_struct *work)
 		item = ctlr->led_queue + ctlr->led_queue_tail;
 		if (item->led == &ctlr->home_led)
 			joycon_home_led_brightness_set(item->led,
-						       item->brightness);
+							   item->brightness);
 		else
 			joycon_player_led_brightness_set(item->led,
 							 item->brightness);
@@ -2438,7 +2438,7 @@ static int joycon_leds_create(struct joycon_ctlr *ctlr)
 	/* Configure the player LEDs */
 	for (i = 0; i < JC_NUM_LEDS; i++) {
 		name = devm_kasprintf(dev, GFP_KERNEL, "%s:%s", d_name,
-				      joycon_player_led_names[i]);
+					  joycon_player_led_names[i]);
 		if (!name) {
 			mutex_unlock(&joycon_input_num_mutex);
 			return -ENOMEM;
@@ -2495,8 +2495,8 @@ static int joycon_leds_create(struct joycon_ctlr *ctlr)
 }
 
 static int joycon_battery_get_property(struct power_supply *supply,
-				       enum power_supply_property prop,
-				       union power_supply_propval *val)
+					   enum power_supply_property prop,
+					   union power_supply_propval *val)
 {
 	struct joycon_ctlr *ctlr = power_supply_get_drvdata(supply);
 	unsigned long flags;
@@ -2569,8 +2569,8 @@ static int joycon_power_supply_create(struct joycon_ctlr *ctlr)
 	ctlr->battery_desc.name = ctlr->battery_desc_name;
 
 	ctlr->battery = power_supply_register(dev,
-					      &ctlr->battery_desc,
-					      &supply_config);
+						  &ctlr->battery_desc,
+						  &supply_config);
 	if (IS_ERR(ctlr->battery)) {
 		ret = PTR_ERR(ctlr->battery);
 		dev_err(dev, "Failed to register battery; ret=%d\n", ret);
@@ -2627,13 +2627,13 @@ static int joycon_read_mac(struct joycon_ctlr *ctlr)
 	}
 
 	ctlr->mac_addr_str = devm_kasprintf(&ctlr->sdev->dev, GFP_KERNEL,
-					    "%02X:%02X:%02X:%02X:%02X:%02X",
-					    ctlr->mac_addr[0],
-					    ctlr->mac_addr[1],
-					    ctlr->mac_addr[2],
-					    ctlr->mac_addr[3],
-					    ctlr->mac_addr[4],
-					    ctlr->mac_addr[5]);
+						"%02X:%02X:%02X:%02X:%02X:%02X",
+						ctlr->mac_addr[0],
+						ctlr->mac_addr[1],
+						ctlr->mac_addr[2],
+						ctlr->mac_addr[3],
+						ctlr->mac_addr[4],
+						ctlr->mac_addr[5]);
 	if (!ctlr->mac_addr_str)
 		return -ENOMEM;
 
@@ -2841,7 +2841,7 @@ static int sio_handshake(struct joycon_ctlr *ctlr)
 	ctlr->msg_type = JOYCON_MSG_TYPE_UART_CMD;
 	ctlr->uart_cmd_match = JC_SIO_CMD_VER_RPT | JC_SIO_CMD_ACK;
 	ret = sio_send_packet(ctlr, JC_SIO_CMD_VER_RPT, version, sizeof(version),
-			      NULL, 0, HZ, true);
+				  NULL, 0, HZ, true);
 	if (ret) {
 		dev_err(dev, "Did not receive rpt version response; ret=%d",
 			ret);
@@ -2851,13 +2851,13 @@ static int sio_handshake(struct joycon_ctlr *ctlr)
 	ctlr->ctlr_type = JOYCON_TYPE_SIO;
 	memcpy(ctlr->mac_addr, mac, sizeof(mac));
 	ctlr->mac_addr_str = devm_kasprintf(&ctlr->sdev->dev, GFP_KERNEL,
-					    "%02X:%02X:%02X:%02X:%02X:%02X",
-					    ctlr->mac_addr[0],
-					    ctlr->mac_addr[1],
-					    ctlr->mac_addr[2],
-					    ctlr->mac_addr[3],
-					    ctlr->mac_addr[4],
-					    ctlr->mac_addr[5]);
+						"%02X:%02X:%02X:%02X:%02X:%02X",
+						ctlr->mac_addr[0],
+						ctlr->mac_addr[1],
+						ctlr->mac_addr[2],
+						ctlr->mac_addr[3],
+						ctlr->mac_addr[4],
+						ctlr->mac_addr[5]);
 	if (!ctlr->mac_addr_str)
 		return -ENOMEM;
 
@@ -2936,9 +2936,9 @@ static int joycon_post_handshake(struct joycon_ctlr *ctlr)
 		}
 	} else {
 		/* SIO and HORI doesn't have any of:
-		    - home, player leds
-		    - rumble
-		    - battery
+			- home, player leds
+			- rumble
+			- battery
 		   and doesn't seem to require calibration.
 		*/
 	}
@@ -3012,7 +3012,7 @@ retry:
 }
 
 static int joycon_serdev_receive_buf(struct serdev_device *serdev,
-				     const unsigned char *buf, size_t len)
+					 const unsigned char *buf, size_t len)
 {
 	struct joycon_ctlr *ctlr = serdev_device_get_drvdata(serdev);
 	struct joycon_uart_packet *packet = (struct joycon_uart_packet *) buf;
@@ -3031,8 +3031,8 @@ static int joycon_serdev_receive_buf(struct serdev_device *serdev,
 		/* Have we received the entire packet? */
 		if (len-j >= 4 && packet->size + 5 <= len-j) {
 			if (packet->magic[0] != JC_UART_MAGIC_RX_0 ||
-			    packet->magic[1] != JC_UART_MAGIC_RX_1 ||
-			    packet->magic[2] != JC_UART_MAGIC_RX_2) {
+				packet->magic[1] != JC_UART_MAGIC_RX_1 ||
+				packet->magic[2] != JC_UART_MAGIC_RX_2) {
 				/* Toss out this packet if the magic is wrong */
 				dev_warn(dev, "Received pkt has wrong magic\n");
 				return len;
@@ -3066,8 +3066,8 @@ static int joycon_serdev_receive_buf(struct serdev_device *serdev,
 		if (packet->size + 5 <= ctlr->partial_pkt_len) {
 			ctlr->partial_pkt_len = 0;
 			if (packet->magic[0] != JC_UART_MAGIC_RX_0 ||
-			    packet->magic[1] != JC_UART_MAGIC_RX_1 ||
-			    packet->magic[2] != JC_UART_MAGIC_RX_2) {
+				packet->magic[1] != JC_UART_MAGIC_RX_1 ||
+				packet->magic[2] != JC_UART_MAGIC_RX_2) {
 				/* Toss out this packet if the magic is wrong */
 				dev_warn(dev, "Received pkt has wrong magic\n");
 				return len;
@@ -3089,7 +3089,7 @@ static int joycon_serdev_receive_buf(struct serdev_device *serdev,
 		case JOYCON_MSG_TYPE_UART_CMD:
 			if (packet->command == ctlr->uart_cmd_match) {
 				memcpy(ctlr->input_buf, buf,
-				       min(len, (size_t)JC_MAX_RESP_SIZE));
+					   min(len, (size_t)JC_MAX_RESP_SIZE));
 				ctlr->msg_type = JOYCON_MSG_TYPE_NONE;
 				ctlr->received_resp = true;
 				wake_up(&ctlr->wait);
@@ -3098,12 +3098,12 @@ static int joycon_serdev_receive_buf(struct serdev_device *serdev,
 			break;
 		case JOYCON_MSG_TYPE_SUBCMD:
 			if (packet->command == JC_CMD_EXTRET &&
-			    packet->data[0] == JC_INPUT_SUBCMD_REPLY) {
+				packet->data[0] == JC_INPUT_SUBCMD_REPLY) {
 				r = (struct joycon_input_report *)packet->data;
 				if (r->reply.id != ctlr->subcmd_ack_match)
 					break;
 				memcpy(ctlr->input_buf, (u8 *)r,
-				       min(len - sizeof(*packet),
+					   min(len - sizeof(*packet),
 					   (size_t)JC_MAX_RESP_SIZE));
 				ctlr->msg_type = JOYCON_MSG_TYPE_NONE;
 				ctlr->received_resp = true;
@@ -3121,8 +3121,8 @@ static int joycon_serdev_receive_buf(struct serdev_device *serdev,
 			dev_dbg(dev, "JC_CMD_EXTRET\n");
 			r = (struct joycon_input_report *)packet->data;
 			if (r->id == JC_INPUT_SUBCMD_REPLY ||
-			    r->id == JC_INPUT_IMU_DATA ||
-			    r->id == JC_INPUT_MCU_DATA)
+				r->id == JC_INPUT_IMU_DATA ||
+				r->id == JC_INPUT_MCU_DATA)
 				joycon_parse_report(ctlr, r);
 		} else if (packet->command == JC_CMD_INITRET) {
 			dev_dbg(dev, "JC_CMD_INITRET\n");
@@ -3210,9 +3210,9 @@ static int sio_serdev_receive_buf(struct serdev_device *serdev,
 		switch (ctlr->msg_type) {
 		case JOYCON_MSG_TYPE_UART_CMD:
 			if (packet->subcmd == ctlr->uart_cmd_match &&
-			    packet->data[0] == JC_SIO_STATUS_OK) {
+				packet->data[0] == JC_SIO_STATUS_OK) {
 				memcpy(ctlr->input_buf, buf,
-				       min(len, (size_t)JC_SIO_MAX_RESP_SIZE));
+					   min(len, (size_t)JC_SIO_MAX_RESP_SIZE));
 				ctlr->msg_type = JOYCON_MSG_TYPE_NONE;
 				ctlr->received_resp = true;
 				wake_up(&ctlr->wait);
@@ -3221,7 +3221,7 @@ static int sio_serdev_receive_buf(struct serdev_device *serdev,
 			break;
 		case JOYCON_MSG_TYPE_SUBCMD:
 			if (packet->subcmd != ctlr->uart_cmd_match ||
-			    packet->data[0] != JC_SIO_STATUS_OK) {
+				packet->data[0] != JC_SIO_STATUS_OK) {
 				return len;
 			}
 			ctlr->msg_type = JOYCON_MSG_TYPE_NONE;
@@ -3236,7 +3236,7 @@ static int sio_serdev_receive_buf(struct serdev_device *serdev,
 		if (subcmd == JC_SIO_CMD_INPUTREPORT) {
 			dev_dbg(dev, "JC_SIO_CMD_INPUTREPORT\n");
 			sio_parse_report(ctlr,
-				    (struct sio_input_report *)packet->payload);
+					(struct sio_input_report *)packet->payload);
 		} else if (subcmd == JC_SIO_CMD_INIT) {
 			dev_dbg(dev, "JC_SIO_CMD_INIT\n");
 		} else if (subcmd == JC_SIO_CMD_VER_RPT) {
@@ -3411,7 +3411,7 @@ static int joycon_serdev_probe(struct serdev_device *serdev)
 	init_waitqueue_head(&ctlr->wait);
 	spin_lock_init(&ctlr->lock);
 	ctlr->rumble_queue = alloc_ordered_workqueue("joycon-serdev-rumble_wq",
-					     WQ_FREEZABLE | WQ_MEM_RECLAIM);
+						 WQ_FREEZABLE | WQ_MEM_RECLAIM);
 	if (!ctlr->rumble_queue) {
 		ret = -ENOMEM;
 		goto err;
@@ -3439,7 +3439,7 @@ static int joycon_serdev_probe(struct serdev_device *serdev)
 		goto err;
 	}
 	serdev_device_set_client_ops(serdev, !ctlr->is_sio ?
-				     &joycon_serdev_ops : &sio_serdev_ops);
+					 &joycon_serdev_ops : &sio_serdev_ops);
 	serdev_device_set_flow_control(serdev, true);
 
 	if (ctlr->is_sio) {
@@ -3493,7 +3493,7 @@ static int joycon_serdev_probe(struct serdev_device *serdev)
 	}
 
 	if (gpio_is_valid(ctlr->detect_gpio) &&
-	    gpio_is_valid(ctlr->detect_en_gpio)) {
+		gpio_is_valid(ctlr->detect_en_gpio)) {
 		if (devm_gpio_request(dev, ctlr->detect_gpio, "jc-detect") < 0) {
 			dev_err(dev, "Failed to request detect gpio\n");
 			goto polling_mode;
@@ -3509,10 +3509,10 @@ static int joycon_serdev_probe(struct serdev_device *serdev)
 
 		ctlr->detect_irq = gpio_to_irq(ctlr->detect_gpio);
 		if (devm_request_threaded_irq(dev, ctlr->detect_irq,
-					      NULL, joycon_detection_irq,
-					      IRQF_TRIGGER_FALLING |
-					      IRQF_ONESHOT,
-					      "jc-detect", ctlr)) {
+						  NULL, joycon_detection_irq,
+						  IRQF_TRIGGER_FALLING |
+						  IRQF_ONESHOT,
+						  "jc-detect", ctlr)) {
 			dev_err(dev, "Failed to request detect irq\n");
 			gpio_set_debounce(ctlr->detect_gpio, 0);
 			devm_gpio_free(dev, ctlr->detect_gpio);
@@ -3548,18 +3548,23 @@ err:
 static void joycon_stop_queues(struct joycon_ctlr *ctlr)
 {
 	dev_info(&ctlr->sdev->dev, "Stopping queues\n");
-	if (ctlr->input_queue) {
-		cancel_delayed_work_sync(&ctlr->input_worker);
-		flush_workqueue(ctlr->input_queue);
-	}
-	if (ctlr->rumble_queue) {
-		cancel_delayed_work_sync(&ctlr->rumble_worker);
-		flush_workqueue(ctlr->rumble_queue);
-	}
-	if (ctlr->detection_queue) {
-		cancel_delayed_work_sync(&ctlr->detection_worker);
-		flush_workqueue(ctlr->detection_queue);
-	}
+	if (ctlr->input_queue)
+		cancel_delayed_work(&ctlr->input_worker);
+	if (ctlr->rumble_queue)
+		cancel_delayed_work(&ctlr->rumble_worker);
+	if (ctlr->detection_queue)
+		cancel_delayed_work(&ctlr->detection_worker);
+}
+
+static void joycon_drain_queues(struct joycon_ctlr *ctlr)
+{
+	dev_info(&ctlr->sdev->dev, "Draining queues\n");
+	if (ctlr->input_queue)
+		drain_workqueue(ctlr->input_queue);
+	if (ctlr->rumble_queue)
+		drain_workqueue(ctlr->rumble_queue);
+	if (ctlr->detection_queue)
+		drain_workqueue(ctlr->detection_queue);
 }
 
 static void joycon_free_queues(struct joycon_ctlr *ctlr)
@@ -3590,6 +3595,7 @@ static void joycon_serdev_remove(struct serdev_device *serdev)
 		joycon_disconnect(ctlr);
 
 	joycon_stop_queues(ctlr);
+	joycon_drain_queues(ctlr);
 	joycon_free_queues(ctlr);
 	ctlr->ctlr_removed = true;
 	if (ctlr->battery)
@@ -3597,7 +3603,7 @@ static void joycon_serdev_remove(struct serdev_device *serdev)
 
 	/* Stop charging */
 	if (!IS_ERR_OR_NULL(ctlr->charger_reg) &&
-	    regulator_is_enabled(ctlr->charger_reg) > 0)
+		regulator_is_enabled(ctlr->charger_reg) > 0)
 		regulator_disable(ctlr->charger_reg);
 
 	if (ctlr->is_sio)
@@ -3609,13 +3615,7 @@ static int __maybe_unused joycon_serdev_suspend(struct device *dev)
 	struct joycon_ctlr *ctlr = dev_get_drvdata(dev);
 	unsigned long flags;
 
-	dev_info(dev, "Suspend\n");
-
-	if (ctlr->detect_en_req) {
-		disable_irq(ctlr->detect_irq);
-		gpio_free(ctlr->detect_en_gpio);
-		ctlr->detect_en_req = false;
-	}
+	dev_info(dev, "Suspend, freezing device\n");
 
 	spin_lock_irqsave(&ctlr->lock, flags);
 	if (ctlr->suspending) {
@@ -3625,7 +3625,15 @@ static int __maybe_unused joycon_serdev_suspend(struct device *dev)
 	ctlr->suspending = true;
 	spin_unlock_irqrestore(&ctlr->lock, flags);
 
+	joycon_stop_queues(ctlr);
+
 	mutex_lock(&ctlr->init_mutex);
+
+	if (ctlr->detect_en_req) {
+		disable_irq(ctlr->detect_irq);
+		gpio_free(ctlr->detect_en_gpio);
+		ctlr->detect_en_req = false;
+	}
 
 	/* Stop charging */
 	if (!IS_ERR_OR_NULL(ctlr->charger_reg) &&
@@ -3633,20 +3641,63 @@ static int __maybe_unused joycon_serdev_suspend(struct device *dev)
 		regulator_disable(ctlr->charger_reg);
 
 	if (ctlr->ctlr_state == JOYCON_CTLR_STATE_READ) {
-		/* Attempt telling the joy-con to sleep to decrease battery drain */
-		if (!ctlr->is_sio)
-			joycon_set_hci_state(ctlr, 0);
-		joycon_disconnect(ctlr);
-
 		if (ctlr->is_sio)
 			gpio_direction_output(ctlr->sio_rst_gpio, 0);
-	}
+		else
+			joycon_set_hci_state(ctlr, 0);
 
-	joycon_stop_queues(ctlr);
+		spin_lock_irqsave(&ctlr->lock, flags);
+		ctlr->ctlr_state = JOYCON_CTLR_STATE_INIT;
+		spin_unlock_irqrestore(&ctlr->lock, flags);
+	}
 
 	mutex_unlock(&ctlr->init_mutex);
 
+	joycon_drain_queues(ctlr);
+
 	return 0;
+}
+
+static int joycon_serdev_thaw(struct device *dev, struct joycon_ctlr *ctlr) {
+    unsigned long flags;
+	int ret;
+
+	mutex_lock(&ctlr->init_mutex);
+
+	if (ctlr->is_sio)
+		ret = sio_handshake(ctlr);
+	else
+		ret = joycon_handshake(ctlr);
+
+	if (!ret) {
+		if (!ctlr->is_hori && !ctlr->is_sio) {
+			mutex_lock(&ctlr->output_mutex);
+			joycon_enable_rumble(ctlr, true);
+			mutex_unlock(&ctlr->output_mutex);
+		}
+
+		spin_lock_irqsave(&ctlr->lock, flags);
+		ctlr->last_input_report_msecs = jiffies_to_msecs(jiffies);
+		ctlr->ctlr_state = JOYCON_CTLR_STATE_READ;
+		ctlr->ctlr_removed = false;
+		spin_unlock_irqrestore(&ctlr->lock, flags);
+
+		/* Start charging */
+		if (!IS_ERR_OR_NULL(ctlr->charger_reg) &&
+			!regulator_is_enabled(ctlr->charger_reg) &&
+			regulator_enable(ctlr->charger_reg))
+			dev_err(dev, "Failed to enable charger\n");
+
+		queue_delayed_work(ctlr->input_queue, &ctlr->input_worker, 0);
+
+		mutex_unlock(&ctlr->init_mutex);
+		dev_info(dev, "Input device thawed\n");
+		return 0;
+	}
+
+	mutex_unlock(&ctlr->init_mutex);
+	dev_warn(dev, "Failed to thaw input device, entering detection\n");
+	return -EINVAL;
 }
 
 static int __maybe_unused joycon_serdev_resume(struct device *dev)
@@ -3661,6 +3712,12 @@ static int __maybe_unused joycon_serdev_resume(struct device *dev)
 
 	if (ctlr->is_sio)
 		gpio_direction_input(ctlr->sio_rst_gpio);
+
+	if (ctlr->input) {
+		dev_info(dev, "Input device active, attempting thaw\n");
+		if (!joycon_serdev_thaw(dev, ctlr))
+			return 0;
+	}
 
 	return joycon_enter_detection(ctlr);
 }
