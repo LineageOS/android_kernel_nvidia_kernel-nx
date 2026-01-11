@@ -623,12 +623,25 @@ static int joycon_serdev_send_sync(struct joycon_ctlr *ctlr, u8 *data,
 {
 	int ret;
 	int tries = 2;
+	unsigned long flags;
+	bool suspending;
 
 	/*
 	 * The controller occasionally seems to drop subcommands. In testing,
 	 * doing one retry after a timeout appears to always work.
 	 */
 	while (tries--) {
+		spin_lock_irqsave(&ctlr->lock, flags);
+		suspending = ctlr->suspending;
+		spin_unlock_irqrestore(&ctlr->lock, flags);
+
+		/* exit early if suspending or controller removed */
+		if (suspending) {
+			dev_info(&ctlr->sdev->dev, "Skipping send\n");
+			ret = 0;
+			goto err;
+		}
+
 		/*
 		 * If we are in the proper reporting mode, wait for an input
 		 * report prior to sending the subcommand. This improves
@@ -2021,20 +2034,11 @@ static int hori_request_input_report(struct joycon_ctlr *ctlr)
 	return ret;
 }
 
-static void joycon_disconnect(struct joycon_ctlr *ctlr)
+static void joycon_remove(struct joycon_ctlr *ctlr)
 {
 	struct device *dev = &ctlr->sdev->dev;
 	int i;
-	unsigned long flags;
 
-	dev_info(dev, "Joy-con disconnected - unregistering\n");
-
-	spin_lock_irqsave(&ctlr->lock, flags);
-	ctlr->ctlr_removed = true;
-	ctlr->ctlr_state = JOYCON_CTLR_STATE_INIT;
-	spin_unlock_irqrestore(&ctlr->lock, flags);
-
-	dev_info(dev, "Removing input device\n");
 	/* Remove input imu device */
 	if (ctlr->imu_input) {
 		input_unregister_device(ctlr->imu_input);
@@ -2087,6 +2091,27 @@ static void joycon_disconnect(struct joycon_ctlr *ctlr)
 			}
 		}
 	}
+}
+
+static void joycon_disconnect(struct joycon_ctlr *ctlr)
+{
+	struct device *dev = &ctlr->sdev->dev;
+	unsigned long flags;
+
+	dev_info(dev, "Joy-con disconnected - unregistering\n");
+
+	spin_lock_irqsave(&ctlr->lock, flags);
+	ctlr->ctlr_removed = true;
+	ctlr->ctlr_state = JOYCON_CTLR_STATE_INIT;
+	spin_unlock_irqrestore(&ctlr->lock, flags);
+
+	if (ctlr->suspending) {
+		dev_info(dev, "Suspending, skipping device unregister\n");
+		return;
+	}
+
+	dev_info(dev, "Removing input device\n");
+	joycon_remove(ctlr);
 
 	/* Set POR for sio */
 	if (ctlr->is_sio)
@@ -3332,7 +3357,12 @@ static int joycon_post_handshake(struct joycon_ctlr *ctlr)
 {
 	int ret;
 	int baudret;
+	bool resumed = false;
 	struct device *dev = &ctlr->sdev->dev;
+
+	/* handle preserved input dev */
+	if (ctlr->input)
+		resumed = true;
 
 	if (!ctlr->is_hori && !ctlr->is_sio) {
 		mutex_lock(&ctlr->output_mutex);
@@ -3361,18 +3391,20 @@ static int joycon_post_handshake(struct joycon_ctlr *ctlr)
 			goto error;
 		}
 
-		/* Initialize the leds */
-		ret = joycon_leds_create(ctlr);
-		if (ret) {
-			dev_err(dev, "Failed to create leds; ret=%d\n", ret);
-			goto error;
-		}
+		if (!resumed) {
+			/* Initialize the leds */
+			ret = joycon_leds_create(ctlr);
+			if (ret) {
+				dev_err(dev, "Failed to create leds; ret=%d\n", ret);
+				goto error;
+			}
 
-		/* Initialize the battery power supply */
-		ret = joycon_power_supply_create(ctlr);
-		if (ret) {
-			dev_err(dev, "Failed to create power_supply; ret=%d\n", ret);
-			goto error;
+			/* Initialize the battery power supply */
+			ret = joycon_power_supply_create(ctlr);
+			if (ret) {
+				dev_err(dev, "Failed to create power_supply; ret=%d\n", ret);
+				goto error;
+			}
 		}
 	} else {
 		/* SIO and HORI doesn't have any of:
@@ -3383,10 +3415,12 @@ static int joycon_post_handshake(struct joycon_ctlr *ctlr)
 		*/
 	}
 
-	ret = joycon_input_create(ctlr);
-	if (ret) {
-		dev_err(dev, "Failed to create input device; ret=%d\n", ret);
-		goto error;
+	if (!resumed) {
+		ret = joycon_input_create(ctlr);
+		if (ret) {
+			dev_err(dev, "Failed to create input device; ret=%d\n", ret);
+			goto error;
+		}
 	}
 
 	ctlr->last_input_report_msecs = jiffies_to_msecs(jiffies);
@@ -4086,6 +4120,8 @@ static int __maybe_unused joycon_serdev_suspend(struct device *dev)
 
 	mutex_lock(&ctlr->init_mutex);
 
+	joycon_stop_queues(ctlr);
+
 	/* Stop charging */
 	if (!IS_ERR_OR_NULL(ctlr->charger_reg) &&
 	    regulator_is_enabled(ctlr->charger_reg) > 0)
@@ -4102,8 +4138,6 @@ static int __maybe_unused joycon_serdev_suspend(struct device *dev)
 			gpio_direction_output(ctlr->sio_rst_gpio, 0);
 		}
 	}
-
-	joycon_stop_queues(ctlr);
 
 	mutex_unlock(&ctlr->init_mutex);
 
