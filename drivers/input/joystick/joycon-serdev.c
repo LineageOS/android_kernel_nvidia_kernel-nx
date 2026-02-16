@@ -39,6 +39,15 @@
 #include <linux/of_gpio.h>
 #include <linux/power_supply.h>
 #include <linux/regulator/consumer.h>
+#ifdef CONFIG_IIO
+#include <linux/iio/iio.h>
+#include <linux/iio/buffer.h>
+#include <linux/iio/kfifo_buf.h>
+#include <linux/iio/sysfs.h>
+#include <linux/iio/trigger.h>
+#include <linux/iio/trigger_consumer.h>
+#include <linux/iio/triggered_buffer.h>
+#endif
 #include <linux/serdev.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
@@ -582,6 +591,17 @@ struct joycon_ctlr {
 	unsigned int imu_delta_samples_count;
 	unsigned int imu_delta_samples_sum;
 	unsigned int imu_avg_delta_ms;
+
+	/* IIO devices for SIO IMU (accelerometer + gyroscope) */
+#ifdef CONFIG_IIO
+	struct iio_dev *iio_accel;
+	struct iio_dev *iio_gyro;
+	struct iio_trigger *iio_accel_trig;
+	struct iio_trigger *iio_gyro_trig;
+	/* Cached latest raw IMU sample for IIO read_raw (after axis remap) */
+	s16 iio_accel_raw[3]; /* X, Y, Z in m/s² raw units */
+	s16 iio_gyro_raw[3];  /* X, Y, Z in rad/s raw units */
+#endif
 };
 
 static int joycon_serdev_send(struct joycon_ctlr *ctlr, u8 *data,
@@ -1262,6 +1282,384 @@ static void joycon_parse_report(struct joycon_ctlr *ctlr,
 	wake_up(&ctlr->wait);
 }
 
+/*
+ * IIO accelerometer and gyroscope channel definitions for SIO IMU.
+ *
+ * The Sio controller's IMU (LSM6DSE or ICM42607) is behind a UART protocol,
+ * so we cannot directly read hardware registers. Instead, IMU data arrives
+ * as serial reports that are parsed in sio_parse_imu_report(). We expose
+ * the data as IIO devices so that Android's sensor HAL can discover proper
+ * accelerometer and gyroscope sensors.
+ *
+ * Scale values match the hardware configuration:
+ *   Accel: ±8G range, 16-bit → 1 LSB = 0.002394202 m/s²
+ *   Gyro:  ±2000dps range, 16-bit → 1 LSB = 0.001065264 rad/s
+ *
+ * ODR is fixed by the Sio firmware (~66Hz, reported as 66.666667 Hz).
+ */
+
+/* --- Accelerometer IIO --- */
+
+#ifdef CONFIG_IIO
+
+enum sio_iio_accel_scan {
+	SIO_IIO_ACCEL_SCAN_X,
+	SIO_IIO_ACCEL_SCAN_Y,
+	SIO_IIO_ACCEL_SCAN_Z,
+	SIO_IIO_ACCEL_SCAN_TIMESTAMP,
+};
+
+#define SIO_IIO_ACCEL_CHAN(_modifier, _index)			\
+{								\
+	.type = IIO_ACCEL,					\
+	.modified = 1,						\
+	.channel2 = _modifier,					\
+	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
+	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),	\
+	.info_mask_shared_by_all =				\
+		BIT(IIO_CHAN_INFO_SAMP_FREQ),			\
+	.scan_index = _index,					\
+	.scan_type = {						\
+		.sign = 's',					\
+		.realbits = 16,					\
+		.storagebits = 16,				\
+		.endianness = IIO_CPU,				\
+	},							\
+}
+
+static const struct iio_chan_spec sio_iio_accel_channels[] = {
+	SIO_IIO_ACCEL_CHAN(IIO_MOD_X, SIO_IIO_ACCEL_SCAN_X),
+	SIO_IIO_ACCEL_CHAN(IIO_MOD_Y, SIO_IIO_ACCEL_SCAN_Y),
+	SIO_IIO_ACCEL_CHAN(IIO_MOD_Z, SIO_IIO_ACCEL_SCAN_Z),
+	IIO_CHAN_SOFT_TIMESTAMP(SIO_IIO_ACCEL_SCAN_TIMESTAMP),
+};
+
+/*
+ * IIO buffer data: size must be a power of 2 and timestamp aligned.
+ * 6 bytes accel (3 x s16) + 2 bytes padding + 8 bytes timestamp = 16 bytes.
+ */
+struct sio_iio_accel_buffer {
+	s16 accel[3];
+	s16 _padding;
+	s64 timestamp __aligned(8);
+};
+
+#define SIO_IIO_SCAN_MASK_ACCEL_3AXIS				\
+	(BIT(SIO_IIO_ACCEL_SCAN_X) |				\
+	 BIT(SIO_IIO_ACCEL_SCAN_Y) |				\
+	 BIT(SIO_IIO_ACCEL_SCAN_Z))
+
+static const unsigned long sio_iio_accel_scan_masks[] = {
+	SIO_IIO_SCAN_MASK_ACCEL_3AXIS,
+	0,
+};
+
+static int sio_iio_accel_read_raw(struct iio_dev *indio_dev,
+				  struct iio_chan_spec const *chan,
+				  int *val, int *val2, long mask)
+{
+	struct joycon_ctlr *ctlr = iio_device_get_drvdata(indio_dev);
+
+	if (chan->type != IIO_ACCEL)
+		return -EINVAL;
+
+	switch (mask) {
+	case IIO_CHAN_INFO_RAW:
+		switch (chan->channel2) {
+		case IIO_MOD_X:
+			*val = READ_ONCE(ctlr->iio_accel_raw[0]);
+			return IIO_VAL_INT;
+		case IIO_MOD_Y:
+			*val = READ_ONCE(ctlr->iio_accel_raw[1]);
+			return IIO_VAL_INT;
+		case IIO_MOD_Z:
+			*val = READ_ONCE(ctlr->iio_accel_raw[2]);
+			return IIO_VAL_INT;
+		default:
+			return -EINVAL;
+		}
+	case IIO_CHAN_INFO_SCALE:
+		/*
+		 * ±8G range, 16-bit: 1 LSB = 8*9.80665/32768 m/s²
+		 * = 0.002394202 m/s² → (0, 2394202) INT_PLUS_NANO
+		 */
+		*val = 0;
+		*val2 = 2394202;
+		return IIO_VAL_INT_PLUS_NANO;
+	case IIO_CHAN_INFO_SAMP_FREQ:
+		/* Sio IMU runs at ~66.67Hz (15ms period) */
+		*val = 66;
+		*val2 = 666667;
+		return IIO_VAL_INT_PLUS_MICRO;
+	default:
+		return -EINVAL;
+	}
+}
+
+static const struct iio_info sio_iio_accel_info = {
+	.driver_module = THIS_MODULE,
+	.read_raw = sio_iio_accel_read_raw,
+};
+
+/* --- Gyroscope IIO --- */
+
+enum sio_iio_gyro_scan {
+	SIO_IIO_GYRO_SCAN_X,
+	SIO_IIO_GYRO_SCAN_Y,
+	SIO_IIO_GYRO_SCAN_Z,
+	SIO_IIO_GYRO_SCAN_TIMESTAMP,
+};
+
+#define SIO_IIO_GYRO_CHAN(_modifier, _index)			\
+{								\
+	.type = IIO_ANGL_VEL,					\
+	.modified = 1,						\
+	.channel2 = _modifier,					\
+	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
+	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),	\
+	.info_mask_shared_by_all =				\
+		BIT(IIO_CHAN_INFO_SAMP_FREQ),			\
+	.scan_index = _index,					\
+	.scan_type = {						\
+		.sign = 's',					\
+		.realbits = 16,					\
+		.storagebits = 16,				\
+		.endianness = IIO_CPU,				\
+	},							\
+}
+
+static const struct iio_chan_spec sio_iio_gyro_channels[] = {
+	SIO_IIO_GYRO_CHAN(IIO_MOD_X, SIO_IIO_GYRO_SCAN_X),
+	SIO_IIO_GYRO_CHAN(IIO_MOD_Y, SIO_IIO_GYRO_SCAN_Y),
+	SIO_IIO_GYRO_CHAN(IIO_MOD_Z, SIO_IIO_GYRO_SCAN_Z),
+	IIO_CHAN_SOFT_TIMESTAMP(SIO_IIO_GYRO_SCAN_TIMESTAMP),
+};
+
+/*
+ * IIO buffer data: 6 bytes gyro (3 x s16) + 2 padding + 8 timestamp = 16.
+ */
+struct sio_iio_gyro_buffer {
+	s16 gyro[3];
+	s16 _padding;
+	s64 timestamp __aligned(8);
+};
+
+#define SIO_IIO_SCAN_MASK_GYRO_3AXIS				\
+	(BIT(SIO_IIO_GYRO_SCAN_X) |				\
+	 BIT(SIO_IIO_GYRO_SCAN_Y) |				\
+	 BIT(SIO_IIO_GYRO_SCAN_Z))
+
+static const unsigned long sio_iio_gyro_scan_masks[] = {
+	SIO_IIO_SCAN_MASK_GYRO_3AXIS,
+	0,
+};
+
+static int sio_iio_gyro_read_raw(struct iio_dev *indio_dev,
+				 struct iio_chan_spec const *chan,
+				 int *val, int *val2, long mask)
+{
+	struct joycon_ctlr *ctlr = iio_device_get_drvdata(indio_dev);
+
+	if (chan->type != IIO_ANGL_VEL)
+		return -EINVAL;
+
+	switch (mask) {
+	case IIO_CHAN_INFO_RAW:
+		switch (chan->channel2) {
+		case IIO_MOD_X:
+			*val = READ_ONCE(ctlr->iio_gyro_raw[0]);
+			return IIO_VAL_INT;
+		case IIO_MOD_Y:
+			*val = READ_ONCE(ctlr->iio_gyro_raw[1]);
+			return IIO_VAL_INT;
+		case IIO_MOD_Z:
+			*val = READ_ONCE(ctlr->iio_gyro_raw[2]);
+			return IIO_VAL_INT;
+		default:
+			return -EINVAL;
+		}
+	case IIO_CHAN_INFO_SCALE:
+		/*
+		 * ±2000dps range, 16-bit: 1 LSB = 2000*π/(180*32768) rad/s
+		 * = 0.001065264 rad/s → (0, 1065264) INT_PLUS_NANO
+		 */
+		*val = 0;
+		*val2 = 1065264;
+		return IIO_VAL_INT_PLUS_NANO;
+	case IIO_CHAN_INFO_SAMP_FREQ:
+		/* Sio IMU runs at ~66.67Hz (15ms period) */
+		*val = 66;
+		*val2 = 666667;
+		return IIO_VAL_INT_PLUS_MICRO;
+	default:
+		return -EINVAL;
+	}
+}
+
+static const struct iio_info sio_iio_gyro_info = {
+	.driver_module = THIS_MODULE,
+	.read_raw = sio_iio_gyro_read_raw,
+};
+
+/* --- SIO IIO triggers --- */
+
+static irqreturn_t sio_iio_accel_trigger_handler(int irq, void *p)
+{
+	struct iio_poll_func *pf = p;
+	struct iio_dev *indio_dev = pf->indio_dev;
+	struct joycon_ctlr *ctlr = iio_device_get_drvdata(indio_dev);
+	struct sio_iio_accel_buffer abuf;
+
+	memset(&abuf, 0, sizeof(abuf));
+	abuf.accel[0] = READ_ONCE(ctlr->iio_accel_raw[0]);
+	abuf.accel[1] = READ_ONCE(ctlr->iio_accel_raw[1]);
+	abuf.accel[2] = READ_ONCE(ctlr->iio_accel_raw[2]);
+
+	iio_push_to_buffers_with_timestamp(indio_dev, &abuf,
+					   iio_get_time_ns(indio_dev));
+
+	iio_trigger_notify_done(indio_dev->trig);
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t sio_iio_gyro_trigger_handler(int irq, void *p)
+{
+	struct iio_poll_func *pf = p;
+	struct iio_dev *indio_dev = pf->indio_dev;
+	struct joycon_ctlr *ctlr = iio_device_get_drvdata(indio_dev);
+	struct sio_iio_gyro_buffer gbuf;
+
+	memset(&gbuf, 0, sizeof(gbuf));
+	gbuf.gyro[0] = READ_ONCE(ctlr->iio_gyro_raw[0]);
+	gbuf.gyro[1] = READ_ONCE(ctlr->iio_gyro_raw[1]);
+	gbuf.gyro[2] = READ_ONCE(ctlr->iio_gyro_raw[2]);
+
+	iio_push_to_buffers_with_timestamp(indio_dev, &gbuf,
+					   iio_get_time_ns(indio_dev));
+
+	iio_trigger_notify_done(indio_dev->trig);
+	return IRQ_HANDLED;
+}
+
+static const struct iio_trigger_ops sio_iio_trigger_ops = {
+	.owner = THIS_MODULE,
+};
+
+/* --- SIO IIO device initialization --- */
+
+static int sio_iio_init(struct joycon_ctlr *ctlr)
+{
+	struct device *dev = &ctlr->sdev->dev;
+	struct iio_dev *indio_dev;
+	struct iio_trigger *trig;
+	int ret;
+
+	/* Accelerometer IIO device */
+	indio_dev = devm_iio_device_alloc(dev, 0);
+	if (!indio_dev)
+		return -ENOMEM;
+
+	iio_device_set_drvdata(indio_dev, ctlr);
+	indio_dev->name = "sio-accel";
+	indio_dev->info = &sio_iio_accel_info;
+	indio_dev->modes = INDIO_DIRECT_MODE;
+	indio_dev->channels = sio_iio_accel_channels;
+	indio_dev->num_channels = ARRAY_SIZE(sio_iio_accel_channels);
+	indio_dev->available_scan_masks = sio_iio_accel_scan_masks;
+
+	/* Create and register trigger */
+	trig = devm_iio_trigger_alloc(dev, "%s-dev%d",
+				      indio_dev->name,
+				      indio_dev->id);
+	if (!trig)
+		return -ENOMEM;
+
+	trig->dev.parent = dev;
+	trig->ops = &sio_iio_trigger_ops;
+	iio_trigger_set_drvdata(trig, ctlr);
+
+	ret = devm_iio_trigger_register(dev, trig);
+	if (ret) {
+		dev_err(dev, "Failed to register accel trigger: %d\n", ret);
+		return ret;
+	}
+
+	ctlr->iio_accel_trig = trig;
+	indio_dev->trig = iio_trigger_get(trig);
+
+	/* Setup triggered buffer */
+	ret = devm_iio_triggered_buffer_setup(dev, indio_dev,
+					      &iio_pollfunc_store_time,
+					      &sio_iio_accel_trigger_handler,
+					      NULL);
+	if (ret) {
+		dev_err(dev, "Failed to setup accel buffer: %d\n", ret);
+		return ret;
+	}
+
+	ret = devm_iio_device_register(dev, indio_dev);
+	if (ret) {
+		dev_err(dev, "Failed to register IIO accel device: %d\n", ret);
+		return ret;
+	}
+	ctlr->iio_accel = indio_dev;
+
+	/* Gyroscope IIO device */
+	indio_dev = devm_iio_device_alloc(dev, 0);
+	if (!indio_dev)
+		return -ENOMEM;
+
+	iio_device_set_drvdata(indio_dev, ctlr);
+	indio_dev->name = "sio-gyro";
+	indio_dev->info = &sio_iio_gyro_info;
+	indio_dev->modes = INDIO_DIRECT_MODE;
+	indio_dev->channels = sio_iio_gyro_channels;
+	indio_dev->num_channels = ARRAY_SIZE(sio_iio_gyro_channels);
+	indio_dev->available_scan_masks = sio_iio_gyro_scan_masks;
+
+	/* Create and register trigger */
+	trig = devm_iio_trigger_alloc(dev, "%s-dev%d",
+				      indio_dev->name,
+				      indio_dev->id);
+	if (!trig)
+		return -ENOMEM;
+
+	trig->dev.parent = dev;
+	trig->ops = &sio_iio_trigger_ops;
+	iio_trigger_set_drvdata(trig, ctlr);
+
+	ret = devm_iio_trigger_register(dev, trig);
+	if (ret) {
+		dev_err(dev, "Failed to register gyro trigger: %d\n", ret);
+		return ret;
+	}
+
+	ctlr->iio_gyro_trig = trig;
+	indio_dev->trig = iio_trigger_get(trig);
+
+	/* Setup triggered buffer */
+	ret = devm_iio_triggered_buffer_setup(dev, indio_dev,
+					      &iio_pollfunc_store_time,
+					      &sio_iio_gyro_trigger_handler,
+					      NULL);
+	if (ret) {
+		dev_err(dev, "Failed to setup gyro buffer: %d\n", ret);
+		return ret;
+	}
+
+	ret = devm_iio_device_register(dev, indio_dev);
+	if (ret) {
+		dev_err(dev, "Failed to register IIO gyro device: %d\n", ret);
+		return ret;
+	}
+	ctlr->iio_gyro = indio_dev;
+
+	dev_info(dev, "Registered SIO IIO accel and gyro devices with triggers\n");
+	return 0;
+}
+
+#endif /* CONFIG_IIO */
+
 static void sio_input_report_parse_imu_data(struct joycon_ctlr *ctlr,
 					       struct sio_input_report *rep,
 					       struct joycon_imu_data *imu_data,
@@ -1436,6 +1834,48 @@ static void sio_parse_imu_report(struct joycon_ctlr *ctlr,
 		input_report_abs(idev, ABS_Y, value[3]);
 		input_report_abs(idev, ABS_Z, value[5]);
 		input_sync(idev);
+
+		/*
+		 * Push calibration-corrected IMU data to IIO buffers.
+		 * Apply the same axis remapping as the input device:
+		 *   IIO X = -raw_Y, IIO Y = raw_X, IIO Z = raw_Z
+		 * Calibration offsets are subtracted so that IIO scale
+		 * converts directly to m/s² (accel) or rad/s (gyro).
+		 */
+#ifdef CONFIG_IIO
+		if (ctlr->iio_accel) {
+			/* Cache for read_raw and trigger handler */
+			WRITE_ONCE(ctlr->iio_accel_raw[0],
+				   -(imu_data[i].accel_y -
+				     ctlr->accel_cal.offset[1]));
+			WRITE_ONCE(ctlr->iio_accel_raw[1],
+				   imu_data[i].accel_x -
+				   ctlr->accel_cal.offset[0]);
+			WRITE_ONCE(ctlr->iio_accel_raw[2],
+				   imu_data[i].accel_z -
+				   ctlr->accel_cal.offset[2]);
+
+			/* Poll trigger to push data to buffer */
+			if (ctlr->iio_accel_trig)
+				iio_trigger_poll(ctlr->iio_accel_trig);
+		}
+		if (ctlr->iio_gyro) {
+			/* Cache for read_raw and trigger handler */
+			WRITE_ONCE(ctlr->iio_gyro_raw[0],
+				   -(imu_data[i].gyro_y -
+				     ctlr->gyro_cal.offset[1]));
+			WRITE_ONCE(ctlr->iio_gyro_raw[1],
+				   imu_data[i].gyro_x -
+				   ctlr->gyro_cal.offset[0]);
+			WRITE_ONCE(ctlr->iio_gyro_raw[2],
+				   imu_data[i].gyro_z -
+				   ctlr->gyro_cal.offset[2]);
+
+			/* Poll trigger to push data to buffer */
+			if (ctlr->iio_gyro_trig)
+				iio_trigger_poll(ctlr->iio_gyro_trig);
+		}
+#endif
 
 		/* Convert to micros and divide by samples per report. */
 		ctlr->imu_timestamp_us += ctlr->imu_avg_delta_ms * 1000 / report_num;
@@ -3528,6 +3968,25 @@ polling_mode:
 		dev_info(dev, "Polling based detection\n");
 	}
 
+	/* Initialize IIO devices for SIO (independent of Joy-Con connection state) */
+#ifdef CONFIG_IIO
+	if (ctlr->is_sio) {
+		/* Set default calibration for IIO (will be updated on handshake) */
+		ctlr->accel_cal.offset[0] = 0;
+		ctlr->accel_cal.offset[1] = 0;
+		ctlr->accel_cal.offset[2] = 0;
+		ctlr->gyro_cal.offset[0] = 0;
+		ctlr->gyro_cal.offset[1] = 0;
+		ctlr->gyro_cal.offset[2] = 0;
+
+		ret = sio_iio_init(ctlr);
+		if (ret) {
+			dev_err(dev, "Failed to init IIO devices: %d\n", ret);
+			goto err_sdev_close;
+		}
+	}
+#endif
+
 	ret = joycon_enter_detection(ctlr);
 	if (ret) {
 		dev_err(dev,
@@ -3634,12 +4093,14 @@ static int __maybe_unused joycon_serdev_suspend(struct device *dev)
 
 	if (ctlr->ctlr_state == JOYCON_CTLR_STATE_READ) {
 		/* Attempt telling the joy-con to sleep to decrease battery drain */
-		if (!ctlr->is_sio)
+		if (!ctlr->is_sio) {
 			joycon_set_hci_state(ctlr, 0);
-		joycon_disconnect(ctlr);
-
-		if (ctlr->is_sio)
+			/* Only disconnect detachable Joy-Cons */
+			joycon_disconnect(ctlr);
+		} else {
+			/* For SIO (Switch Lite), just power down via reset GPIO */
 			gpio_direction_output(ctlr->sio_rst_gpio, 0);
+		}
 	}
 
 	joycon_stop_queues(ctlr);
@@ -3659,9 +4120,18 @@ static int __maybe_unused joycon_serdev_resume(struct device *dev)
 	ctlr->suspending = false;
 	spin_unlock_irqrestore(&ctlr->lock, flags);
 
-	if (ctlr->is_sio)
+	if (ctlr->is_sio) {
+		/* For SIO, just release reset GPIO - devices are still registered */
 		gpio_direction_input(ctlr->sio_rst_gpio);
+		/* Update timestamp to prevent spurious disconnect detection */
+		ctlr->last_input_report_msecs = jiffies_to_msecs(jiffies);
+		/* Restart input polling */
+		if (ctlr->ctlr_state == JOYCON_CTLR_STATE_READ)
+			queue_delayed_work(ctlr->input_queue, &ctlr->input_worker, 0);
+		return 0;
+	}
 
+	/* For detachable Joy-Cons, re-enter detection */
 	return joycon_enter_detection(ctlr);
 }
 

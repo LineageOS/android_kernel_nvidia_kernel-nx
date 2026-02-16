@@ -117,6 +117,9 @@ config JOYSTICK_JOYCON_SERDEV
 	select SERIAL_DEV_BUS
 	select POWER_SUPPLY
 	select CRC8
+	select IIO_KFIFO_BUF if IIO
+	select IIO_TRIGGER if IIO
+	select IIO_TRIGGERED_BUFFER if IIO
 	help
 	Adds support for the Nintendo Switch Joy-Cons connected via serial.
 
