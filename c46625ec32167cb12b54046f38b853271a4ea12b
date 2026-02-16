@@ -1,0 +1,72 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "cfb75079_740016e8",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 27741
+      },
+      "writtenOn": "2026-02-16T22:21:19Z",
+      "side": 1,
+      "message": "great work. general feedback:\n- commit message needs work and is way too long, condense down\n- fyi, the imu is connectable to console, but it\u0027s mutually exclusive--you set a gpio basically and configure it either to sio or console (where it would work with stock IIO stuff). this is a good solution though as it should allow both to work at once.\n- should be made clear in message this only fixes sleep for lite--joycons require...a more comprehensive solution.\n- see inline comments",
+      "revId": "c46625ec32167cb12b54046f38b853271a4ea12b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "c41f2e40_8c63eea6",
+        "filename": "drivers/input/joystick/Kconfig",
+        "patchSetId": 2
+      },
+      "lineNbr": 120,
+      "author": {
+        "id": 27741
+      },
+      "writtenOn": "2026-02-16T22:21:19Z",
+      "side": 1,
+      "message": "same comment as before, either let\u0027s gate IIO support on CONFIG_IIO or add another config like JOYCON_SERDEV_FF -\u003e JOYCON_SERDEV_IIO or smth",
+      "revId": "c46625ec32167cb12b54046f38b853271a4ea12b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "05ef41b3_f198c530",
+        "filename": "drivers/input/joystick/joycon-serdev.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 42,
+      "author": {
+        "id": 27741
+      },
+      "writtenOn": "2026-02-16T22:21:19Z",
+      "side": 1,
+      "message": "Let\u0027s block off IIO-related code on #ifdef CONFG_IIO or something. I would like this buildable with or without IIO support.",
+      "revId": "c46625ec32167cb12b54046f38b853271a4ea12b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "6e37a127_6d17b211",
+        "filename": "drivers/input/joystick/joycon-serdev.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 4118,
+      "author": {
+        "id": 27741
+      },
+      "writtenOn": "2026-02-16T22:21:19Z",
+      "side": 1,
+      "message": "is this queue actually getting frozen/drained on suspend?",
+      "revId": "c46625ec32167cb12b54046f38b853271a4ea12b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
