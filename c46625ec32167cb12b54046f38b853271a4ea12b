@@ -18,6 +18,23 @@
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "c76e64a6_26817dd8",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 16185
+      },
+      "writtenOn": "2026-02-16T22:23:30Z",
+      "side": 1,
+      "message": "also worth noting: This is part of a larger problem: https://review.lineageos.org/c/LineageOS/android_kernel_nvidia_kernel-nx/+/468244\n\nIf you feel like taking a look and solving that issue as well.",
+      "revId": "c46625ec32167cb12b54046f38b853271a4ea12b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "c41f2e40_8c63eea6",
