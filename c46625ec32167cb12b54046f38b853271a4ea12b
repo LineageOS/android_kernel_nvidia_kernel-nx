@@ -55,6 +55,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "5f945e2d_def8ec7a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 16185
+      },
+      "writtenOn": "2026-02-17T07:09:00Z",
+      "side": 1,
+      "message": "There is absolutely an issue for full switch.\n\nBattery drains when joy cons are attached because they interrupt deep sleep.\n\nSee the patchiest I linked",
+      "parentUuid": "f71a7a52_31a6d0dc",
+      "revId": "c46625ec32167cb12b54046f38b853271a4ea12b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "c41f2e40_8c63eea6",
         "filename": "drivers/input/joystick/Kconfig",
         "patchSetId": 2
