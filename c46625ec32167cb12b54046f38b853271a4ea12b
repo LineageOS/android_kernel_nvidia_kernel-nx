@@ -35,6 +35,24 @@
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "f71a7a52_31a6d0dc",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 36681
+      },
+      "writtenOn": "2026-02-17T06:33:26Z",
+      "side": 1,
+      "message": "3. I\u0027m not aware if there are sleep issues for full Switch. My understanding was that with Lite there is no dedicated IMU, so no sensors, and Android trying to read missing sensors in the loop and not falling asleep. I may be wrong, but there should be edicated IMU constantly connected to CPU in full switch, so this issue should be non existent.",
+      "parentUuid": "cfb75079_740016e8",
+      "revId": "c46625ec32167cb12b54046f38b853271a4ea12b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "c41f2e40_8c63eea6",
@@ -48,6 +66,24 @@
       "writtenOn": "2026-02-16T22:21:19Z",
       "side": 1,
       "message": "same comment as before, either let\u0027s gate IIO support on CONFIG_IIO or add another config like JOYCON_SERDEV_FF -\u003e JOYCON_SERDEV_IIO or smth",
+      "revId": "c46625ec32167cb12b54046f38b853271a4ea12b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "e79409da_b5acad02",
+        "filename": "drivers/input/joystick/Kconfig",
+        "patchSetId": 2
+      },
+      "lineNbr": 120,
+      "author": {
+        "id": 36681
+      },
+      "writtenOn": "2026-02-17T06:33:26Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "c41f2e40_8c63eea6",
       "revId": "c46625ec32167cb12b54046f38b853271a4ea12b",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     },
@@ -69,6 +105,24 @@
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "9b2e320c_09f408db",
+        "filename": "drivers/input/joystick/joycon-serdev.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 42,
+      "author": {
+        "id": 36681
+      },
+      "writtenOn": "2026-02-17T06:33:26Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "05ef41b3_f198c530",
+      "revId": "c46625ec32167cb12b54046f38b853271a4ea12b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "6e37a127_6d17b211",
@@ -82,6 +136,24 @@
       "writtenOn": "2026-02-16T22:21:19Z",
       "side": 1,
       "message": "is this queue actually getting frozen/drained on suspend?",
+      "revId": "c46625ec32167cb12b54046f38b853271a4ea12b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "f5190f00_36a2faa1",
+        "filename": "drivers/input/joystick/joycon-serdev.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 4118,
+      "author": {
+        "id": 36681
+      },
+      "writtenOn": "2026-02-17T06:33:26Z",
+      "side": 1,
+      "message": "Yes. joycon_serdev_suspend calls joycon_stop_queues which cancells delayed work on input_worker and flushes queue on inout_queue.",
+      "parentUuid": "6e37a127_6d17b211",
       "revId": "c46625ec32167cb12b54046f38b853271a4ea12b",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
