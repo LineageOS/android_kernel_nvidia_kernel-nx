@@ -39,6 +39,7 @@
 #include <linux/of_gpio.h>
 #include <linux/power_supply.h>
 #include <linux/regulator/consumer.h>
+#ifdef CONFIG_IIO
 #include <linux/iio/iio.h>
 #include <linux/iio/buffer.h>
 #include <linux/iio/kfifo_buf.h>
@@ -46,6 +47,7 @@
 #include <linux/iio/trigger.h>
 #include <linux/iio/trigger_consumer.h>
 #include <linux/iio/triggered_buffer.h>
+#endif
 #include <linux/serdev.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
@@ -591,6 +593,7 @@ struct joycon_ctlr {
 	unsigned int imu_avg_delta_ms;
 
 	/* IIO devices for SIO IMU (accelerometer + gyroscope) */
+#ifdef CONFIG_IIO
 	struct iio_dev *iio_accel;
 	struct iio_dev *iio_gyro;
 	struct iio_trigger *iio_accel_trig;
@@ -598,6 +601,7 @@ struct joycon_ctlr {
 	/* Cached latest raw IMU sample for IIO read_raw (after axis remap) */
 	s16 iio_accel_raw[3]; /* X, Y, Z in m/s² raw units */
 	s16 iio_gyro_raw[3];  /* X, Y, Z in rad/s raw units */
+#endif
 };
 
 static int joycon_serdev_send(struct joycon_ctlr *ctlr, u8 *data,
@@ -1296,6 +1300,8 @@ static void joycon_parse_report(struct joycon_ctlr *ctlr,
 
 /* --- Accelerometer IIO --- */
 
+#ifdef CONFIG_IIO
+
 enum sio_iio_accel_scan {
 	SIO_IIO_ACCEL_SCAN_X,
 	SIO_IIO_ACCEL_SCAN_Y,
@@ -1652,6 +1658,8 @@ static int sio_iio_init(struct joycon_ctlr *ctlr)
 	return 0;
 }
 
+#endif /* CONFIG_IIO */
+
 static void sio_input_report_parse_imu_data(struct joycon_ctlr *ctlr,
 					       struct sio_input_report *rep,
 					       struct joycon_imu_data *imu_data,
@@ -1834,6 +1842,7 @@ static void sio_parse_imu_report(struct joycon_ctlr *ctlr,
 		 * Calibration offsets are subtracted so that IIO scale
 		 * converts directly to m/s² (accel) or rad/s (gyro).
 		 */
+#ifdef CONFIG_IIO
 		if (ctlr->iio_accel) {
 			/* Cache for read_raw and trigger handler */
 			WRITE_ONCE(ctlr->iio_accel_raw[0],
@@ -1866,6 +1875,7 @@ static void sio_parse_imu_report(struct joycon_ctlr *ctlr,
 			if (ctlr->iio_gyro_trig)
 				iio_trigger_poll(ctlr->iio_gyro_trig);
 		}
+#endif
 
 		/* Convert to micros and divide by samples per report. */
 		ctlr->imu_timestamp_us += ctlr->imu_avg_delta_ms * 1000 / report_num;
@@ -3959,6 +3969,7 @@ polling_mode:
 	}
 
 	/* Initialize IIO devices for SIO (independent of Joy-Con connection state) */
+#ifdef CONFIG_IIO
 	if (ctlr->is_sio) {
 		/* Set default calibration for IIO (will be updated on handshake) */
 		ctlr->accel_cal.offset[0] = 0;
@@ -3974,6 +3985,7 @@ polling_mode:
 			goto err_sdev_close;
 		}
 	}
+#endif
 
 	ret = joycon_enter_detection(ctlr);
 	if (ret) {
