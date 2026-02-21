@@ -145,6 +145,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "c1a39bca_80ec131d",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 36681
+      },
+      "writtenOn": "2026-02-21T23:32:10Z",
+      "side": 1,
+      "message": "I do not have non-lite to verify anyway, we could wait until someone verifies on non-lite. If I don\u0027t figure out correct way to suspend/resume joycons by then we could merge as is.",
+      "parentUuid": "6d703a49_5780dc38",
+      "revId": "c46625ec32167cb12b54046f38b853271a4ea12b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "c41f2e40_8c63eea6",
         "filename": "drivers/input/joystick/Kconfig",
         "patchSetId": 2
