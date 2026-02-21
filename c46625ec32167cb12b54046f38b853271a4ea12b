@@ -107,6 +107,24 @@
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "b2527e3b_56b97308",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 36681
+      },
+      "writtenOn": "2026-02-21T19:39:38Z",
+      "side": 1,
+      "message": "Ok, I\u0027m looking into it still. Yes, seems like queues need to be drained before device is disconnected, but that has uncovered another issue in joycond which does not expect procon to get it\u0027s controllers disconnected and on lite so is matched to procon.\n\nI don\u0027t have full switch to test, so currently testing drain-disconnect in isolation of this change on my Lite.",
+      "parentUuid": "da5df5be_64e3438f",
+      "revId": "c46625ec32167cb12b54046f38b853271a4ea12b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "c41f2e40_8c63eea6",
