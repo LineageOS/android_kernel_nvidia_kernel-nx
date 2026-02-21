@@ -127,6 +127,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "6d703a49_5780dc38",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 16185
+      },
+      "writtenOn": "2026-02-21T20:00:54Z",
+      "side": 1,
+      "message": "so, we can either merge this as is or wait for the full-fix for all models - either way though, this /needs/ to be triple checked on non-lite model before merge - and mine is with my little cousins for the week.\n\nSo, if someone wants to V+ this on a non-lite nx, we can merge - or if we get the full-fix pushed for review first we can go that route.",
+      "parentUuid": "b2527e3b_56b97308",
+      "revId": "c46625ec32167cb12b54046f38b853271a4ea12b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "c41f2e40_8c63eea6",
         "filename": "drivers/input/joystick/Kconfig",
         "patchSetId": 2
