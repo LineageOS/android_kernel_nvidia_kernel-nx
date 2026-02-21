@@ -89,6 +89,24 @@
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "da5df5be_64e3438f",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 27741
+      },
+      "writtenOn": "2026-02-21T18:55:10Z",
+      "side": 1,
+      "message": "@kurohtinv@gmail.com yea there are sleep issues for full switch but that does not need to be addresed here.\n\nAnd no that\u0027s not the issue (trying to read sensors). Basically Android EPOLL\u0027s the device and (a) wq drain takes too long and (b) the disconnect of joycons/removal of input dev counts as a wakeup event. the stuff around line 4124 in this pset resolves the main issues for sio (just minor mods to the reset sequence so the queues are suspended and resumed properly), it is harder for joycons.\n\nregarding dedicated IMU, yea basically the IMU is shared on lite and you can config it to one or the other (sio vs internal).\n\nmarking resolved",
+      "parentUuid": "2efb7016_b139c7a9",
+      "revId": "c46625ec32167cb12b54046f38b853271a4ea12b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "c41f2e40_8c63eea6",
