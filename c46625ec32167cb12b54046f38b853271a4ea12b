@@ -163,6 +163,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "1acefb82_3621e7a0",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 27741
+      },
+      "writtenOn": "2026-02-22T05:03:34Z",
+      "side": 1,
+      "message": "we are not waiting for other model fix, this is wholly unrelated to the other models. we will verify on non lite and add v+ when that is done.",
+      "parentUuid": "c1a39bca_80ec131d",
+      "revId": "c46625ec32167cb12b54046f38b853271a4ea12b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "c41f2e40_8c63eea6",
         "filename": "drivers/input/joystick/Kconfig",
         "patchSetId": 2
