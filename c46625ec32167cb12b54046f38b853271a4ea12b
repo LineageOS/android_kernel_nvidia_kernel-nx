@@ -181,6 +181,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "cd910daf_a3b259ed",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 36681
+      },
+      "writtenOn": "2026-02-23T01:51:17Z",
+      "side": 1,
+      "message": "Thanks, @halorocker89@gmail.com. Could you, please, look into this as well: https://review.lineageos.org/c/LineageOS/android_kernel_nvidia_kernel-nx/+/475018 Seems like a simple change, but it fixed deep sleep at least on Lite. I had to modify joycond as well to process connect/disconnect on Lite, but with changes in this patch it won\u0027t be necessary, so I\u0027m not including it.\n\nIn logcal I can see pure gap between when device falls asleep and resumes. Interestingly enough, joycon_serdev suspend logs are coming through as if at resume time, but I think this is just an artifact.",
+      "parentUuid": "1acefb82_3621e7a0",
+      "revId": "c46625ec32167cb12b54046f38b853271a4ea12b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "c41f2e40_8c63eea6",
         "filename": "drivers/input/joystick/Kconfig",
         "patchSetId": 2
