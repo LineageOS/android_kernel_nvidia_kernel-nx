@@ -1113,6 +1113,11 @@ static void joycon_parse_report(struct joycon_ctlr *ctlr,
 	enum joycon_ctlr_type type = ctlr->ctlr_type;
 	unsigned long msecs = jiffies_to_msecs(jiffies);
 
+	if (!dev) {
+		dev_warn(&ctlr->sdev->dev, "parse_report: input dev is NULL\n");
+		return;
+	}
+
 	dev_dbg(&ctlr->sdev->dev, "parse_report()\n");
 
 	spin_lock_irqsave(&ctlr->lock, flags);
@@ -1300,6 +1305,10 @@ static void sio_parse_imu_report(struct joycon_ctlr *ctlr,
 	/* Return if there is no imu report */
 	if (imu_type == SIO_IMU_NOTFOUND || !report_num)
 		return;
+	if (!idev) {
+		dev_warn(dev, "sio_parse_imu_report: imu input dev is NULL\n");
+		return;
+	}
 
 	sio_input_report_parse_imu_data(ctlr, rep, imu_data, report_num);
 
@@ -1451,6 +1460,11 @@ static void sio_parse_report(struct joycon_ctlr *ctlr,
 	u32 btns;
 	u16 raw_x, raw_y, raw_rx, raw_ry;
 	s32 x, y, rx, ry;
+
+	if (!dev) {
+		dev_warn(&ctlr->sdev->dev, "sio_parse_report: input dev is NULL\n");
+		return;
+	}
 
 	dev_dbg(&ctlr->sdev->dev, "parse_report()\n");
 
@@ -3116,7 +3130,7 @@ static int joycon_serdev_receive_buf(struct serdev_device *serdev,
 		}
 	}
 
-	if (ctlr->ctlr_state == JOYCON_CTLR_STATE_READ) {
+	if (ctlr->ctlr_state == JOYCON_CTLR_STATE_READ && !ctlr->suspending) {
 		if (packet->command == JC_CMD_EXTRET) {
 			dev_dbg(dev, "JC_CMD_EXTRET\n");
 			r = (struct joycon_input_report *)packet->data;
@@ -3231,7 +3245,7 @@ static int sio_serdev_receive_buf(struct serdev_device *serdev,
 		}
 	}
 
-	if (ctlr->ctlr_state == JOYCON_CTLR_STATE_READ) {
+	if (ctlr->ctlr_state == JOYCON_CTLR_STATE_READ && !ctlr->suspending) {
 		subcmd = packet->subcmd & (~JC_SIO_CMD_ACK);
 		if (subcmd == JC_SIO_CMD_INPUTREPORT) {
 			dev_dbg(dev, "JC_SIO_CMD_INPUTREPORT\n");
@@ -3636,12 +3650,15 @@ static int __maybe_unused joycon_serdev_suspend(struct device *dev)
 		/* Attempt telling the joy-con to sleep to decrease battery drain */
 		if (!ctlr->is_sio)
 			joycon_set_hci_state(ctlr, 0);
-		joycon_disconnect(ctlr);
 
 		if (ctlr->is_sio)
 			gpio_direction_output(ctlr->sio_rst_gpio, 0);
 	}
 
+	/*
+	* Stop input queues, but do not tear down the device to avoid waking userspace back up,
+	* wait till resume to recreate input devices.
+	*/
 	joycon_stop_queues(ctlr);
 
 	mutex_unlock(&ctlr->init_mutex);
@@ -3659,8 +3676,16 @@ static int __maybe_unused joycon_serdev_resume(struct device *dev)
 	ctlr->suspending = false;
 	spin_unlock_irqrestore(&ctlr->lock, flags);
 
-	if (ctlr->is_sio)
+	if (ctlr->is_sio) {
 		gpio_direction_input(ctlr->sio_rst_gpio);
+	}
+
+	/*
+	* Input devices were kept alive across suspend to
+	* avoid the evdev hangup waking userspace. Tear them down
+	* now before re-entering detection.
+	*/
+	joycon_disconnect(ctlr);
 
 	return joycon_enter_detection(ctlr);
 }
