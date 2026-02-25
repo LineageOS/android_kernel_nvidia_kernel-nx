@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "e05d4222_814bb5a2",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 36681
+      },
+      "writtenOn": "2026-02-25T05:40:12Z",
+      "side": 1,
+      "message": "Just to note. This can be tested on non-lite, on lite it will cause joycond crash as it is not ready to see input device disconnect. I can add that, but seeing how the other patch makes input devices persistent that seems redundant. \n\nLet me know if you prefer to take these patches in order, merged together, or joycond patched for completeness.",
+      "revId": "9198add3a40e1b697ba13da08f855679fbe8b2d4",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
