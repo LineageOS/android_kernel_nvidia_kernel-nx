@@ -217,6 +217,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "08bf2c82_3e0ceca7",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 16185
+      },
+      "writtenOn": "2026-03-20T02:06:54Z",
+      "side": 1,
+      "message": "sorry we have been away from our nx and unable to test for regressions on non vali devices. ETA as soon as we can get back to them.",
+      "parentUuid": "610031e0_701df0be",
+      "revId": "c46625ec32167cb12b54046f38b853271a4ea12b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "c41f2e40_8c63eea6",
         "filename": "drivers/input/joystick/Kconfig",
         "patchSetId": 2
